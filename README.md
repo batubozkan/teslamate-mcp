@@ -4,7 +4,8 @@
 
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes your [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to MCP-aware AI clients (Claude Desktop, Cursor, etc.) over either stdio or streamable HTTP.
+Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 35 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -13,101 +14,158 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes
 [![License](https://img.shields.io/github/license/batubozkan/teslamate-mcp)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-Fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp) carrying the 0.4.0+ feature line: typed tool parameters & outputs, 12 additional analytics/search tools, MCP SDK v2 (spec 2026-07-28), interactive MCP Apps charts, opt-in charging-cost writes with elicitation confirm, and OpenTelemetry export.
+This is a fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp). It adds the 0.4.0+ feature line.
 
 </div>
 
-## Features
+## What you can ask
 
-- **35 tools** — 30 predefined analytics & search queries (battery capacity & degradation, vampire drain, charging efficiency & costs, geofences, driving, efficiency, locations, routes, search and detail) plus `run_sql`, `get_database_schema`, and 3 MCP Apps chart tools
-- **MCP Apps** — `show_charging_curve`, `show_battery_degradation`, and `show_drive_route` render interactive charts directly in the conversation on Apps-capable clients, and degrade to plain data everywhere else
-- **Typed tool parameters & outputs** — every predefined tool accepts optional filters (`car_name`, `days` windows, `limit`, thresholds) declared in its `.toml` sidecar, validated at startup, and bound safely via psycopg named params; `[[output]]` declarations give each tool a typed per-column `outputSchema`. Zero-argument calls return the full classic report
-- **Timezone-aware reports** — set `REPORT_TIMEZONE` (IANA name) so daily/weekly/monthly buckets follow your local midnight instead of UTC
-- **6 prompts** — one-click workflows for battery health, driving summary, charging behaviour, anomaly hunting, weather efficiency, and a quick status report
-- **Resources** — `teslamate://queries` and `teslamate://queries/{name}` for catalog browsing, plus the `ui://` chart apps
-- **Hardened `run_sql`** — runs inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and an automatic row cap
-- **Live schema introspection** — `get_database_schema` lists all tables compactly, full column detail for one `table`, and re-reads the schema on demand with `refresh=true`
-- **Two transports, one binary** — `teslamate-mcp stdio` for local clients, `teslamate-mcp http` for remote
-- **Bearer-token auth** with timing-safe comparison; `/health` probe for liveness checks
-- **`Decimal → float` JSON serialization** so language models see numbers, not strings
+- "Is my battery really degrading?" — the server estimates usable capacity in kWh from your charging sessions.
+- "How much range do I lose while parked?" — the server finds vampire drain between drives.
+- "Show the route of my longest drive." — the server returns the GPS track, with an interactive map on chart-capable clients.
+- "Compare my driving this month with last month." — one call returns both windows, per metric.
+
+## Highlights
+
+- **30 SQL report tools.** Battery capacity and degradation, vampire drain, charging efficiency (AC vs DC), charging costs, geofences, driving patterns, routes, and search tools for drives and charging sessions.
+- **3 interactive charts (MCP Apps).** `show_charging_curve`, `show_battery_degradation`, and `show_drive_route` draw charts inside the conversation. On clients without chart support, the same tools return plain rows.
+- **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
+- **Safe custom SQL.** `run_sql` runs your `SELECT` inside a PostgreSQL `READ ONLY` transaction, with timeouts and a row cap. The transaction always rolls back.
+- **Optional cost writes, with confirmation.** One opt-in tool writes charging costs. A column-scoped database grant limits what it can touch. Clients with MCP elicitation show a confirmation dialog first.
+- **Local-time reports.** Set `REPORT_TIMEZONE` and daily, weekly, and monthly buckets follow your local midnight.
+- **Two transports.** Run `teslamate-mcp stdio` for local clients. Run `teslamate-mcp http` for remote clients, with bearer-token auth and a `/health` probe.
 
 ## Requirements
 
-- TeslaMate already running against PostgreSQL
-- Python 3.11+ for a local install, or Docker for a remote deployment
+- TeslaMate with its PostgreSQL database.
+- Python 3.11+ for a local install, or Docker for a server install.
 
-## Install
+## Quick start — local (stdio)
 
-```bash
-git clone https://github.com/batubozkan/teslamate-mcp.git
-cd teslamate-mcp
-cp env.example .env
-# Edit .env — at minimum, set DATABASE_URL
-uv sync
-```
+1. Install:
 
-## CLI
+   ```bash
+   git clone https://github.com/batubozkan/teslamate-mcp.git
+   cd teslamate-mcp
+   cp env.example .env      # set DATABASE_URL
+   uv sync
+   ```
 
-The `teslamate-mcp` console script has four subcommands:
+2. Add the server to your MCP client. Example for Claude Desktop or Cursor:
 
-```bash
-teslamate-mcp stdio                          # local (Cursor / Claude Desktop)
-teslamate-mcp http [--host] [--port]         # remote (HTTP / SSE)
-teslamate-mcp gen-token                      # produce an AUTH_TOKEN value
-teslamate-mcp list-tools                     # diagnostic: list registered tools
-```
+   ```json
+   {
+     "mcpServers": {
+       "teslamate": {
+         "command": "uv",
+         "args": ["--directory", "/path/to/teslamate-mcp", "run", "teslamate-mcp", "stdio"]
+       }
+     }
+   }
+   ```
 
-`python -m teslamate_mcp <subcommand>` works too.
-
-## Local use (stdio)
-
-Configure your MCP client to launch the stdio server. Example for Cursor or Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "teslamate": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/teslamate-mcp", "run", "teslamate-mcp", "stdio"]
-    }
-  }
-}
-```
-
-## Remote use (Docker)
+## Quick start — Docker
 
 ```bash
-cp env.example .env
-# Set DATABASE_URL and ideally AUTH_TOKEN
+cp env.example .env          # set DATABASE_URL, and set AUTH_TOKEN for remote use
 docker compose up -d
 ```
 
-The MCP endpoint is at `http://localhost:8888/mcp` and a liveness probe is exposed at `http://localhost:8888/health`.
+The MCP endpoint is `http://localhost:8888/mcp`. The liveness probe is `http://localhost:8888/health`.
 
-A prebuilt multi-arch image (`linux/amd64`, `linux/arm64`) is also published to GHCR on every tagged release:
+A multi-arch image (`linux/amd64`, `linux/arm64`) is published to GHCR on each release:
 
 ```bash
 docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/batubozkan/teslamate-mcp:latest
 ```
 
+## Deploy on Unraid, behind Cloudflare
+
+You can reach this server from claude.ai, Claude Desktop, and mobile — with OAuth login and with no open ports on your home network.
+
+The **[Unraid + Cloudflare deployment guide](deploy/unraid/UNRAID_CLOUDFLARE_DEPLOYMENT.md)** shows the full path:
+
+1. Run the container on Unraid with the included [Community Apps template](deploy/unraid/teslamate-mcp.xml).
+2. Publish it through a Cloudflare Tunnel. No inbound firewall rules are necessary.
+3. Put a Cloudflare Zero Trust **MCP Server Portal** in front. The portal handles OAuth for Claude clients and sends the bearer token upstream.
+
+The guide includes the exact dashboard fields, verification commands for each phase, and a troubleshooting table.
+
+## Tools
+
+Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `limit`, and thresholds where they apply. A call with no arguments returns the full report.
+
+### Reports (18)
+
+| Group | Tools |
+|---|---|
+| Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history` |
+| Battery | `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends` |
+| Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day` |
+| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_unusual_power_consumption` |
+| Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
+
+### Insights (6)
+
+| Tool | What it returns |
+|---|---|
+| `get_battery_capacity_trend` | Usable capacity in kWh, estimated from charging sessions (energy added ÷ SOC gained), per month and car |
+| `get_vampire_drain` | Range lost while parked between drives; gaps that contain a charge do not count |
+| `get_charging_efficiency` | kWh added vs kWh drawn per car, split into AC and DC |
+| `get_charging_by_geofence` | Charging totals per TeslaMate geofence, plus an "Ungeofenced" group |
+| `get_soc_hygiene` | Share of samples above 80% and below 20% state of charge |
+| `get_period_comparison` | The last N days vs the N days before, one row per metric |
+
+### Search and detail (6)
+
+| Tool | What it returns |
+|---|---|
+| `search_drives` | Drives filtered by date range, location text, distance, and car; sortable |
+| `search_charging_sessions` | Charging sessions filtered by date range, location, energy, and car |
+| `get_drive_details` | Full statistics for one drive |
+| `get_drive_route` | GPS track points for one drive, downsampled |
+| `get_charging_curve` | Power and SOC curve for one charging session, downsampled |
+| `get_charging_costs` | Costs grouped by month, location, or car |
+
+### Charts (3)
+
+`show_charging_curve`, `show_battery_degradation`, and `show_drive_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool.
+
+### Custom (2)
+
+- `get_database_schema` — lists all tables, shows the columns of one table, and re-reads the schema when you pass `refresh=true`.
+- `run_sql` — runs one custom `SELECT` or `WITH … SELECT`.
+
+### Cost writes (opt-in, off by default)
+
+Set `ENABLE_CHARGING_WRITES=true` to register `set_charging_cost(charging_process_id, cost)`. It sets the cost of one charging session. This is the same field that the TeslaMate UI edits. A `backfill_costs_from_receipts` prompt guides the receipt-matching workflow.
+
+Give the database role write access to that single column only:
+
+```sql
+GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;
+```
+
+This grant is the security boundary. The tool cannot write anything else. On clients with MCP elicitation, the user confirms each write in a dialog. `run_sql` stays read-only in all cases.
+
 ## Configuration
 
-All settings are read from environment variables (`.env` supported). Only `DATABASE_URL` is required.
+The server reads all settings from environment variables. It also reads a `.env` file. Only `DATABASE_URL` is required.
 
-| Variable                | Default     | Notes                                                       |
+| Variable                | Default     | Purpose                                                     |
 |-------------------------|-------------|-------------------------------------------------------------|
 | `DATABASE_URL`          | _required_  | `postgresql://user:pass@host:5432/teslamate`                |
-| `AUTH_TOKEN`            | _empty_     | Enables bearer auth on the HTTP endpoint                    |
+| `AUTH_TOKEN`            | _empty_     | Turns on bearer auth for the HTTP endpoint                  |
 | `HOST`                  | `0.0.0.0`   | HTTP bind host                                              |
 | `PORT`                  | `8888`      | HTTP bind port                                              |
-| `POOL_MIN_SIZE`         | `1`         | psycopg pool floor                                          |
-| `POOL_MAX_SIZE`         | `10`        | psycopg pool ceiling                                        |
+| `POOL_MIN_SIZE`         | `1`         | Minimum pool connections                                    |
+| `POOL_MAX_SIZE`         | `10`        | Maximum pool connections                                    |
 | `QUERY_TIMEOUT_MS`      | `5000`      | `statement_timeout` for `run_sql`                           |
-| `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | LIMIT injected when `run_sql` doesn't supply one            |
-| `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for daily/weekly/monthly report buckets       |
-| `ENABLE_CHARGING_WRITES`| `false`     | Register `set_charging_cost` (needs the UPDATE(cost) grant) |
-| `LOG_LEVEL`             | `INFO`      | Standard Python log level                                   |
-| `DEBUG`                 | `false`     | Starlette debug mode (keep off in production)               |
+| `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Row cap added when `run_sql` has no `LIMIT`                 |
+| `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
+| `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
+| `LOG_LEVEL`             | `INFO`      | Python log level                                            |
+| `DEBUG`                 | `false`     | Starlette debug mode; keep off in production                |
 
 Generate a bearer token:
 
@@ -115,83 +173,18 @@ Generate a bearer token:
 uv run teslamate-mcp gen-token
 ```
 
-## Available tools
+## Add your own query
 
-Every predefined tool accepts **optional filters** — `car_name` (substring match) everywhere,
-plus `days` windows, `limit` caps, and per-tool thresholds where they make sense. Calling a
-tool with no arguments returns the full classic report.
+No code change is necessary. The server finds new queries at startup.
 
-### Predefined reports (18)
-
-**Vehicle:** `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`
-
-**Battery & health:** `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends`
-
-**Driving:** `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`
-
-**Efficiency:** `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_unusual_power_consumption`
-
-**Charging & location:** `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations`
-
-### Insights (6)
-
-- `get_battery_capacity_trend` — usable battery capacity (kWh) estimated from charging sessions (energy added ÷ SOC gained), monthly per car — a real energy-based degradation signal
-- `get_vampire_drain` — rated range lost while parked between drives, excluding gaps that contain a charge
-- `get_charging_efficiency` — kWh added vs kWh drawn per car, split AC vs DC
-- `get_charging_by_geofence` — charging totals per TeslaMate geofence (Home/Work/…) plus "Ungeofenced"
-- `get_soc_hygiene` — share of samples above 80% / below 20% SOC (battery-care habits)
-- `get_period_comparison` — last N days vs the N days before, one row per driving/charging metric
-
-### Search & detail (6)
-
-- `search_drives` — filter drives by date range, location text, distance bounds, car; sortable
-- `search_charging_sessions` — filter charging sessions by date range, location, energy, car
-- `get_drive_details(drive_id)` — full stats for one drive found via search
-- `get_drive_route(drive_id)` — downsampled GPS track points for one drive
-- `get_charging_curve(charging_process_id)` — downsampled power/SOC curve for one session
-- `get_charging_costs` — cost breakdown grouped by month, location, or car
-
-### MCP Apps (3)
-
-`show_charging_curve`, `show_battery_degradation`, and `show_drive_route` are the interactive
-counterparts of `get_charging_curve`, `get_battery_degradation_over_time`, and
-`get_drive_route`: on Apps-capable clients they render a self-contained chart (charging curve,
-degradation trend, route map) inline in the conversation; on every other client they return
-exactly the same rows as their backing query tool.
-
-### Custom (2)
-
-- `get_database_schema([table], [refresh])` — compact table list, full column detail for one table, or a forced re-read after DDL changes
-- `run_sql(query)` — execute a custom `SELECT` or `WITH … SELECT`
-
-### Write tools (opt-in, off by default)
-
-Set `ENABLE_CHARGING_WRITES=true` to register **`set_charging_cost(charging_process_id, cost)`**
-— sets the total cost of one charging session (the same field TeslaMate's UI edits), plus a
-`backfill_costs_from_receipts` prompt that guides the receipt→session matching workflow.
-On clients that support MCP elicitation the user is shown a confirmation dialog before each
-write; clients without it proceed directly (unchanged behavior).
-
-Grant the database role write access to **that single column only** (the real security
-boundary — nothing else can ever be written):
-
-```sql
-GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;
-```
-
-`run_sql` stays read-only regardless (READ ONLY transaction + forced rollback), and the
-declarative query registry never writes.
-
-## Adding a new query
-
-1. Drop a SELECT into `src/teslamate_mcp/queries/your_query.sql`.
-2. Add a sibling `your_query.toml`:
+1. Put a `SELECT` in `src/teslamate_mcp/queries/your_query.sql`.
+2. Add `your_query.toml` next to it:
 
    ```toml
    name = "get_your_data"
    description = "What this returns, units, grouping, and available filters."
 
-   [[params]]                 # optional — declare typed tool arguments
+   [[params]]                 # optional: typed tool arguments
    name = "car_name"
    type = "string"            # string | integer | number | boolean
    description = "Case-insensitive substring match on the car's name."
@@ -204,26 +197,30 @@ declarative query registry never writes.
    minimum = 1
    maximum = 100
 
-   [[output]]                 # optional — one table per result column for a typed outputSchema
+   [[output]]                 # optional: one entry per result column
    name = "car_name"
    type = "string"
    ```
 
-3. Reference params in the SQL as `%(car_name)s` placeholders — **never** string-interpolate.
-   Rules enforced at startup: every declared param must appear in the SQL (and vice versa);
-   cast the first occurrence (`%(car_name)s::text`, `%(limit)s::int`) so NULL binding works;
-   escape literal `%` as `%%` in parameterized queries. The reserved `%(tz)s` placeholder binds
-   `REPORT_TIMEZONE` automatically for `AT TIME ZONE` bucketing.
-4. Restart the server. The registry validates and picks it up automatically
-   (`teslamate-mcp list-tools` to confirm).
+3. Write parameters as `%(car_name)s` placeholders in the SQL. Do not build SQL from strings. Cast the first use of each placeholder, for example `%(limit)s::int`. Write a literal `%` as `%%`. The reserved `%(tz)s` placeholder binds `REPORT_TIMEZONE`.
+4. Restart the server. The registry validates the pair and registers the tool. Run `teslamate-mcp list-tools` to confirm.
+
+The startup validation rejects a query when a declared parameter is missing from the SQL, or when the SQL uses an undeclared parameter.
+
+## Security
+
+- `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
+- Use a `SELECT`-only PostgreSQL role for defense in depth.
+- The HTTP transport compares bearer tokens with a timing-safe function.
+- Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
 ## Development
 
 ```bash
-uv sync                          # install with dev deps
+uv sync                          # install with dev dependencies
 uv run ruff check src tests      # lint
 uv run ruff format src tests     # format
-uv run pytest                    # tests (Docker-backed integration tests skip if Docker is absent)
+uv run pytest                    # 119 tests; Docker-backed tests skip without Docker
 ```
 
 ## License

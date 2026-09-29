@@ -43,7 +43,9 @@ async def test_app_tools_declare_ui_binding() -> None:
 
     for spec in APP_SPECS:
         tool = tools[spec.tool_name]
-        assert tool.meta == {"ui": {"resourceUri": spec.uri}}, spec.tool_name
+        assert tool.meta == {"ui": {"resourceUri": spec.uri}, "ui/resourceUri": spec.uri}, (
+            spec.tool_name
+        )
         assert "ctx" not in tool.input_schema.get("properties", {}), spec.tool_name
         assert tool.annotations.read_only_hint is True
         # Drift-proof: the app tool exposes exactly its backing query's contract.

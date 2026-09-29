@@ -93,6 +93,12 @@ APP_SPECS: tuple[AppSpec, ...] = (
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri
 
+# The ext-apps reference SDK (registerAppTool) stamps both `_meta.ui.resourceUri`
+# and this deprecated flat key, because hosts that predate the nested form only
+# read the flat one. The Python SDK's Apps.tool() writes only the nested form,
+# so add the flat key ourselves to match what hosts are tested against.
+LEGACY_RESOURCE_URI_META_KEY = "ui/resourceUri"
+
 
 # History (0.8.0 → 0.9.1): a ResourceLinkedApps subclass used to prepend a
 # result-level `resource_link` block as a second rendering signal. It never
@@ -136,6 +142,7 @@ def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -
         handler.__doc__ = spec.tool_description
         apps.tool(
             resource_uri=spec.uri,
+            meta={LEGACY_RESOURCE_URI_META_KEY: spec.uri},
             name=spec.tool_name,
             description=spec.tool_description,
             annotations=annotations,

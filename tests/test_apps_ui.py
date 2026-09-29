@@ -9,6 +9,7 @@ from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.apps_ui import (
     APP_SPECS,
     CHARGING_CURVE_APP_URI,
+    _load_app_html,
     build_apps_extension,
 )
 
@@ -56,6 +57,22 @@ async def test_app_tools_declare_ui_binding() -> None:
     curve = tools["show_charging_curve"]
     assert curve.input_schema["required"] == ["charging_process_id"]
     assert curve.input_schema["properties"]["max_points"]["default"] == 120
+
+
+@pytest.mark.parametrize("spec", APP_SPECS, ids=lambda s: s.tool_name)
+def test_app_handshake_matches_ext_apps_schema(spec) -> None:
+    """Hosts validate ui/initialize against McpUiInitializeRequest and deliver
+    tool data only after `initialized`; a wrong field name leaves the view
+    empty. Regression: the apps sent `clientInfo` instead of `appInfo`."""
+    html = _load_app_html(spec.html_file)
+    init = html[html.index('request("ui/initialize"') :]
+    init = init[: init.index("})")]
+    for field in ("protocolVersion:", "appInfo:", "appCapabilities:"):
+        assert field in init, (spec.tool_name, field)
+    assert "clientInfo" not in init, spec.tool_name
+    # Host requests that expect a response must get one.
+    assert 'msg.method === "ping"' in html, spec.tool_name
+    assert 'msg.method === "ui/resource-teardown"' in html, spec.tool_name
 
 
 def test_missing_curve_query_fails_fast() -> None:

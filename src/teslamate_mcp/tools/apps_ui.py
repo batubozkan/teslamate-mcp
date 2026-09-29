@@ -9,7 +9,9 @@ Apps extension still get the data.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+from functools import cache
 from importlib.resources import files
 
 from mcp.server.apps import Apps
@@ -18,25 +20,47 @@ from mcp.types import ToolAnnotations
 from .registry import PredefinedTool, make_query_handler
 
 
+@cache
+def _load_app_html(filename: str) -> str:
+    return files("teslamate_mcp").joinpath("apps", filename).read_text(encoding="utf-8")
+
+
+@cache
+def _html_fingerprint(filename: str) -> str:
+    return hashlib.sha256(_load_app_html(filename).encode("utf-8")).hexdigest()[:12]
+
+
 @dataclass(frozen=True)
 class AppSpec:
     """One UI-bound tool: a bundled query rendered by a bundled HTML app."""
 
     tool_name: str
     query_name: str
-    uri: str
+    base_uri: str
     html_file: str
     resource_name: str
     resource_title: str
     resource_description: str
     tool_description: str
 
+    @property
+    def uri(self) -> str:
+        """The served `ui://` URI, fingerprinted with the view's content.
+
+        Hosts cache a view by its URI, so an unchanged URI kept serving a stale
+        copy after a server upgrade (claude.ai kept running a view whose
+        handshake a later release had fixed). A content hash in the path gives
+        every changed view a new URI and leaves unchanged ones cacheable.
+        """
+        scheme_host, _, name = self.base_uri.rpartition("/")
+        return f"{scheme_host}/{_html_fingerprint(self.html_file)}/{name}"
+
 
 APP_SPECS: tuple[AppSpec, ...] = (
     AppSpec(
         tool_name="show_charging_curve",
         query_name="get_charging_curve",
-        uri="ui://teslamate/charging-curve.html",
+        base_uri="ui://teslamate/charging-curve.html",
         html_file="charging_curve.html",
         resource_name="charging_curve_chart",
         resource_title="Charging curve chart",
@@ -55,7 +79,7 @@ APP_SPECS: tuple[AppSpec, ...] = (
     AppSpec(
         tool_name="show_battery_degradation",
         query_name="get_battery_degradation_over_time",
-        uri="ui://teslamate/battery-degradation.html",
+        base_uri="ui://teslamate/battery-degradation.html",
         html_file="battery_degradation.html",
         resource_name="battery_degradation_chart",
         resource_title="Battery degradation chart",
@@ -73,7 +97,7 @@ APP_SPECS: tuple[AppSpec, ...] = (
     AppSpec(
         tool_name="show_drive_route",
         query_name="get_drive_route",
-        uri="ui://teslamate/drive-route.html",
+        base_uri="ui://teslamate/drive-route.html",
         html_file="drive_route.html",
         resource_name="drive_route_map",
         resource_title="Drive route map",
@@ -106,10 +130,6 @@ LEGACY_RESOURCE_URI_META_KEY = "ui/resourceUri"
 # "Resource links are not currently supported" notice for the block instead of
 # ignoring it — so app tools now rely solely on the spec's tool-level
 # `_meta.ui.resourceUri` binding. Do not re-add the result-level link.
-
-
-def _load_app_html(filename: str) -> str:
-    return files("teslamate_mcp").joinpath("apps", filename).read_text(encoding="utf-8")
 
 
 def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -> Apps:

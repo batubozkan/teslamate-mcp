@@ -75,6 +75,20 @@ def test_app_handshake_matches_ext_apps_schema(spec) -> None:
     assert 'msg.method === "ui/resource-teardown"' in html, spec.tool_name
 
 
+def test_app_uris_are_content_fingerprinted() -> None:
+    """Hosts cache views by URI; a changed view must get a new one."""
+    import hashlib
+    import re
+
+    for spec in APP_SPECS:
+        match = re.fullmatch(r"ui://teslamate/([0-9a-f]{12})/([a-z-]+\.html)", spec.uri)
+        assert match, spec.uri
+        html = _load_app_html(spec.html_file)
+        assert match.group(1) == hashlib.sha256(html.encode("utf-8")).hexdigest()[:12]
+        assert spec.base_uri.endswith("/" + match.group(2))
+    assert len({spec.uri for spec in APP_SPECS}) == len(APP_SPECS)
+
+
 def test_missing_curve_query_fails_fast() -> None:
     with pytest.raises(RuntimeError, match="get_charging_curve"):
         build_apps_extension([], report_timezone="UTC")

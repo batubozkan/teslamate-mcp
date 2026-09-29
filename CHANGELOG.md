@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-09-30
+
+### Fixed
+- **Hosts could keep running a stale chart view after an upgrade.** View URIs
+  never changed between releases, and after upgrading to 0.11.2 claude.ai's
+  frame still ran a view without the fixed handshake. Views are now served at
+  `ui://teslamate/<content-hash>/<name>.html`, so any change to a view gets a
+  new URI while unchanged views stay cacheable.
+- **Charts showed "no data" when the host omitted `structuredContent`.** The
+  views now fall back to the rows in the result's text blocks.
+
 ## [0.11.2] - 2026-09-30
 
 ### Fixed

@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-30
+
 ### Added
 - **Cloudflare Access authentication.** With `CF_ACCESS_TEAM_DOMAIN` and
   `CF_ACCESS_AUD` set, the HTTP transport also accepts requests carrying a

@@ -259,8 +259,7 @@ The portal endpoint is now: **`https://mcp.your-domain.com/mcp`**
 
 Optional, and it can run alongside the portal. Claude signs in through a Cloudflare Access
 application on a second tunnel hostname and talks to the container directly, so `ui://`
-URIs arrive unchanged and the `show_*` charts render. Requires the release that adds
-`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` (see CHANGELOG).
+URIs arrive unchanged and the `show_*` charts render. Requires **0.11.0+**.
 
 ```
 claude.ai ──OAuth (Access Managed OAuth)──► https://teslamate-direct.your-domain.com/mcp

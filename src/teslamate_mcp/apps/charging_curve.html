@@ -192,14 +192,31 @@ function onToolInput(args) {
   }
 }
 
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
 function onToolResult(result) {
   if (result.isError) {
     const text = (result.content || []).map((c) => c.text || "").join(" ");
     showState("Could not load the charging curve. " + text);
     return;
   }
-  const sc = result.structuredContent;
-  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  rows = extractRows(result);
   if (!rows.length) {
     showState("No charge points recorded for this session.");
     return;

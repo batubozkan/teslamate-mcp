@@ -71,7 +71,7 @@ cp env.example .env          # set DATABASE_URL, and set AUTH_TOKEN for remote u
 docker compose up -d
 ```
 
-The MCP endpoint is `http://localhost:8888/mcp`. The liveness probe is `http://localhost:8888/health`.
+The MCP endpoint is `http://localhost:8888/mcp`. The health probe is `http://localhost:8888/health`. It runs a `SELECT 1` against the database and returns `503` when the database is unreachable.
 
 A multi-arch image (`linux/amd64`, `linux/arm64`) is published to GHCR on each release:
 
@@ -160,7 +160,8 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `PORT`                  | `8888`      | HTTP bind port                                              |
 | `POOL_MIN_SIZE`         | `1`         | Minimum pool connections                                    |
 | `POOL_MAX_SIZE`         | `10`        | Maximum pool connections                                    |
-| `QUERY_TIMEOUT_MS`      | `5000`      | `statement_timeout` for `run_sql`                           |
+| `STATEMENT_TIMEOUT_MS`  | `30000`     | `statement_timeout` for every query, including reports      |
+| `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Row cap added when `run_sql` has no `LIMIT`                 |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
@@ -210,7 +211,7 @@ The startup validation rejects a query when a declared parameter is missing from
 ## Security
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
-- Use a `SELECT`-only PostgreSQL role for defense in depth.
+- Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
 - The HTTP transport compares bearer tokens with a timing-safe function.
 - Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
@@ -220,7 +221,7 @@ The startup validation rejects a query when a declared parameter is missing from
 uv sync                          # install with dev dependencies
 uv run ruff check src tests      # lint
 uv run ruff format src tests     # format
-uv run pytest                    # 119 tests; Docker-backed tests skip without Docker
+uv run pytest                    # 125 tests; Docker-backed tests skip without Docker
 ```
 
 ## License

@@ -89,7 +89,7 @@ Option B — manual (**Docker → Add Container**):
 | Repository | `ghcr.io/batubozkan/teslamate-mcp:latest` (this repo's release image, v0.4.0+) |
 | Network type | `bridge` |
 | Port | host `8888` → container `8888` (TCP) |
-| Env `DATABASE_URL` | `postgresql://teslamate_ro:<pw>@192.168.1.100:5432/teslamate` (or the main `teslamate` user) |
+| Env `DATABASE_URL` | `postgresql://teslamate_ro:<pw>@192.168.1.100:5432/teslamate` (not the main `teslamate` user — it is a superuser; see [SECURITY.md](../../SECURITY.md)) |
 | Env `AUTH_TOKEN` | `<AUTH_TOKEN>` from step 1.1 |
 | Env `REPORT_TIMEZONE` | `Europe/Istanbul` (IANA name; daily/monthly buckets follow local midnight) |
 | Env `LOG_LEVEL` | `INFO` |

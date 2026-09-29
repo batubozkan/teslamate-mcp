@@ -32,9 +32,9 @@
           Description="Streamable HTTP MCP endpoint (/mcp) and liveness probe (/health)."
           Type="Port" Display="always" Required="true" Mask="false">8888</Config>
   <Config Name="DATABASE_URL" Target="DATABASE_URL"
-          Default="postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
-          Description="PostgreSQL connection string for the TeslaMate database. Use the Unraid host IP and the credentials from your TeslaMate PostgreSQL container. A SELECT-only role is recommended."
-          Type="Variable" Display="always" Required="true" Mask="true">postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate</Config>
+          Default="postgresql://teslamate_ro:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
+          Description="PostgreSQL connection string for the TeslaMate database. Use the Unraid host IP and the credentials from your TeslaMate PostgreSQL container. Use a SELECT-only role (e.g. teslamate_ro), not the teslamate superuser - see SECURITY.md."
+          Type="Variable" Display="always" Required="true" Mask="true">postgresql://teslamate_ro:CHANGE_ME@192.168.1.100:5432/teslamate</Config>
   <Config Name="AUTH_TOKEN" Target="AUTH_TOKEN" Default="" Mode=""
           Description="Bearer token protecting /mcp. Generate with: openssl rand -base64 32 (or `teslamate-mcp gen-token`). Leave empty ONLY for LAN-only unauthenticated use - never when exposed via tunnel."
           Type="Variable" Display="always" Required="true" Mask="true"></Config>

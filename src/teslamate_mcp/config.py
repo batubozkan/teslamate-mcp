@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     auth_token: SecretStr | None = Field(
         default=None,
         description="Bearer token for HTTP transport. Auth is disabled when empty.",
+    )
+    cf_access_team_domain: str | None = Field(
+        default=None,
+        description=(
+            "Cloudflare Access team domain (e.g. myteam.cloudflareaccess.com). With "
+            "CF_ACCESS_AUD, accepts requests carrying a verified Cf-Access-Jwt-Assertion."
+        ),
+    )
+    cf_access_aud: str | None = Field(
+        default=None,
+        description="Application Audience (AUD) tag of the Cloudflare Access application.",
     )
 
     host: str = Field(default="0.0.0.0", description="HTTP bind host.")
@@ -81,6 +92,13 @@ class Settings(BaseSettings):
         except ZoneInfoNotFoundError as exc:
             raise ValueError(f"Unknown IANA timezone: {value!r}") from exc
         return value
+
+    @model_validator(mode="after")
+    def _check_cf_access_pair(self) -> Settings:
+        # One without the other would silently leave Access auth off.
+        if bool(self.cf_access_team_domain) != bool(self.cf_access_aud):
+            raise ValueError("Set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD together, or neither")
+        return self
 
 
 def load_settings() -> Settings:

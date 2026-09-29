@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **Cloudflare Access authentication.** With `CF_ACCESS_TEAM_DOMAIN` and
+  `CF_ACCESS_AUD` set, the HTTP transport also accepts requests carrying a
+  verified `Cf-Access-Jwt-Assertion` (RS256 signature against the team's
+  published keys, issuer, audience, expiry; keys cached and refetched on
+  rotation). `AUTH_TOKEN` keeps working alongside it. This lets claude.ai
+  connect through an Access application with Managed OAuth directly, instead
+  of through the MCP Server Portal, which namespaces `ui://` resource URIs
+  (`teslamate-mcp_ui://...`) and so prevents the `show_*` charts from rendering.
+- `pyjwt[crypto]` is now a direct dependency (it was already installed
+  transitively through `mcp`).
+
 ## [0.10.1] - 2026-08-03
 
 ### Fixed

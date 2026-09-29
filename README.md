@@ -91,6 +91,8 @@ The **[Unraid + Cloudflare deployment guide](deploy/unraid/UNRAID_CLOUDFLARE_DEP
 
 The guide includes the exact dashboard fields, verification commands for each phase, and a troubleshooting table.
 
+> The portal rewrites `ui://` resource URIs, so the interactive charts (`show_*` tools) do not render through it. To get them, connect Claude through Cloudflare Access directly. The guide's [direct connection](deploy/unraid/UNRAID_CLOUDFLARE_DEPLOYMENT.md#phase-3b--direct-connection-for-interactive-charts) section shows how.
+
 ## Tools
 
 Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `limit`, and thresholds where they apply. A call with no arguments returns the full report.
@@ -156,6 +158,8 @@ The server reads all settings from environment variables. It also reads a `.env`
 |-------------------------|-------------|-------------------------------------------------------------|
 | `DATABASE_URL`          | _required_  | `postgresql://user:pass@host:5432/teslamate`                |
 | `AUTH_TOKEN`            | _empty_     | Turns on bearer auth for the HTTP endpoint                  |
+| `CF_ACCESS_TEAM_DOMAIN` | _empty_     | Cloudflare Access team domain; accepts Access-verified requests |
+| `CF_ACCESS_AUD`         | _empty_     | Audience tag of that Access application (set with the above) |
 | `HOST`                  | `0.0.0.0`   | HTTP bind host                                              |
 | `PORT`                  | `8888`      | HTTP bind port                                              |
 | `POOL_MIN_SIZE`         | `1`         | Minimum pool connections                                    |
@@ -212,7 +216,7 @@ The startup validation rejects a query when a declared parameter is missing from
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
-- The HTTP transport compares bearer tokens with a timing-safe function.
+- The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
 - Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
 ## Development
@@ -221,7 +225,7 @@ The startup validation rejects a query when a declared parameter is missing from
 uv sync                          # install with dev dependencies
 uv run ruff check src tests      # lint
 uv run ruff format src tests     # format
-uv run pytest                    # 125 tests; Docker-backed tests skip without Docker
+uv run pytest                    # 138 tests; Docker-backed tests skip without Docker
 ```
 
 ## License

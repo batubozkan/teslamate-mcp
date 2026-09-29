@@ -208,11 +208,12 @@ capabilities, and the server status becomes **Ready** (27 tools with writes enab
 After deploying a new server version with added/changed tools, force **⋯ → Sync capabilities**
 on the MCP server entry (auto-resync is ~2h).
 
-> **MCP Apps note (0.7.0+)**: `show_charging_curve` carries a `ui://` chart the client can
-> render in-conversation (extension `io.modelcontextprotocol/ui`). Whether the interactive
-> chart appears depends on the client and on the portal passing the extension through; on
-> clients without Apps support the tool degrades to plain data rows, identical to
-> `get_charging_curve`.
+> **MCP Apps charts do not render through the portal.** The portal namespaces every
+> resource URI (`ui://teslamate/drive-route.html` is only readable as
+> `teslamate-mcp_ui://teslamate/drive-route.html`) and leaves the `ui://` resources out of
+> `resources/list`, so the host cannot load the chart a `show_*` tool points at and falls
+> back to the plain data rows. Cloudflare has not shipped MCP Apps support for portals
+> (checked 2026-09-30). For charts, use the direct connection in **Phase 3b**.
 
 ### 3.2 Create the portal
 
@@ -251,6 +252,54 @@ The portal endpoint is now: **`https://mcp.your-domain.com/mcp`**
 
 > Capabilities re-sync automatically ~every 2 hours; after adding new queries to the
 > server, use **⋯ → Sync capabilities** to refresh immediately.
+
+---
+
+## Phase 3b — Direct connection (for interactive charts)
+
+Optional, and it can run alongside the portal. Claude signs in through a Cloudflare Access
+application on a second tunnel hostname and talks to the container directly, so `ui://`
+URIs arrive unchanged and the `show_*` charts render. Requires the release that adds
+`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` (see CHANGELOG).
+
+```
+claude.ai ──OAuth (Access Managed OAuth)──► https://teslamate-direct.your-domain.com/mcp
+        Access adds a signed Cf-Access-Jwt-Assertion header ──► tunnel ──► container
+        (the container verifies it: CF_ACCESS_TEAM_DOMAIN + CF_ACCESS_AUD)
+```
+
+1. **Second public hostname**: Networks → Tunnels → `unraid` → Public hostnames → Add.
+   Subdomain `teslamate-direct`, domain `your-domain.com`, type `HTTP`, URL
+   `192.168.1.100:8888` (the same service as `teslamate-mcp`, which the portal keeps using).
+2. **Access application**: Zero Trust → Access controls → Applications → Add →
+   **Self-hosted**. Domain `teslamate-direct.your-domain.com`, policy Allow → Emails →
+   `you@example.com`. After saving, copy the **Application Audience (AUD) tag** from the
+   application's overview.
+3. **Managed OAuth**: edit the application → **Advanced settings → Managed OAuth** on, with
+   the same redirect URIs and localhost/loopback settings as Phase 3.3.
+4. **Check the OAuth challenge.** claude.ai needs the `WWW-Authenticate` header to start
+   the login:
+   ```bash
+   curl -si -X POST https://teslamate-direct.your-domain.com/mcp | grep -i www-authenticate
+   # → Bearer realm="OAuth", … resource_metadata="https://teslamate-direct…/.well-known/…"
+   ```
+   The `team_domain` in the `resource_metadata` document is the value for step 5.
+5. **Container env**: add these, then Apply.
+
+   | Variable | Value |
+   |---|---|
+   | `CF_ACCESS_TEAM_DOMAIN` | `<team>.cloudflareaccess.com` |
+   | `CF_ACCESS_AUD` | the AUD tag from step 2 |
+
+   Keep `AUTH_TOKEN` set; the portal path still uses it. The container log should show
+   `Cloudflare Access authentication enabled`.
+6. **Connect**: claude.ai → Settings → Connectors → Add custom connector →
+   `https://teslamate-direct.your-domain.com/mcp` → Connect → Access login. Then disconnect
+   the portal connector so Claude doesn't pick the chart-less copy of each tool. Try
+   *"Show me the route of my last drive."*
+
+A request to `/mcp` needs either the static token or an assertion signed by your Access
+team for this application's audience; anything else gets `401`.
 
 ---
 
@@ -354,6 +403,8 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 | Portal server stuck "Sync Required" | Re-save the custom header credentials; **⋯ → Sync capabilities** |
 | Sync fails `HTTP 403` / `Error POSTing to endpoint: error code: 1003` | Trailing-slash mismatch: the portal's saved hostname ends in `/mcp/` (SDK v1's canonical form, and the hostname field is immutable) while SDK v2 serves `/mcp` and 307-redirects `/mcp/`; uvicorn's redirect behind the tunnel has a malformed `Location`, which Cloudflare rejects as 1003. Fixed in **0.6.1** — the server normalizes `/mcp/` to `/mcp`, so both forms answer directly. Upgrade the container, then **Sync capabilities** |
 | claude.ai "Authorization failed" at Connect | Known Managed-OAuth/connector issue — see Phase 4 fallbacks |
+| `show_*` tools return rows but no chart | Connected through the portal, which rewrites `ui://` URIs; use the direct connection (Phase 3b) |
+| Direct hostname: `401 Authorization required` after a successful Access login | `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` not set on the container, or the AUD tag belongs to another application; the container log shows `Rejected Cloudflare Access assertion: …` for a wrong AUD |
 | Tools list stale after adding a query | Portal syncs ~2h; force with **Sync capabilities** |
 
 ## Security notes

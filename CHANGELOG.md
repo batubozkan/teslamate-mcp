@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-09-30
+
+### Fixed
+- **MCP Apps charts opened but stayed empty.** The chart views sent
+  `clientInfo` in `ui/initialize`, but `McpUiInitializeRequest` (ext-apps
+  2026-01-26) requires `appInfo`, `appCapabilities` and `protocolVersion`, and
+  hosts validate it. The host rejected the handshake, the view swallowed the
+  error and never sent `ui/notifications/initialized`, and hosts deliver
+  `tool-input`/`tool-result` only after that notification. All three views now
+  send the spec's fields, answer the host's `ping`, reply `Method not found` to
+  other host requests instead of leaving them to time out, and show an error
+  state when the handshake is rejected.
+
 ## [0.11.1] - 2026-09-30
 
 ### Fixed

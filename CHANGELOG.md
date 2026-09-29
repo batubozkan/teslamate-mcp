@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-09-30
+
+### Fixed
+- **MCP Apps charts could still fall back to plain rows.** App tools now carry
+  the deprecated flat `_meta["ui/resourceUri"]` key alongside
+  `_meta.ui.resourceUri`, matching the ext-apps reference SDK
+  (`registerAppTool`), which stamps both because hosts that predate the nested
+  form only read the flat one. The Python SDK's `Apps.tool()` writes only the
+  nested form.
+
 ## [0.11.0] - 2026-09-30
 
 ### Added

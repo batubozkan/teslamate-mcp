@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 41 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 42 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -118,12 +118,13 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 | `get_soc_hygiene` | Share of samples above 80% and below 20% state of charge |
 | `get_period_comparison` | The last N days vs the N days before, one row per metric |
 
-### Car state (2)
+### Timeline and car state (3)
 
 TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now.
 
 | Tool | What it returns |
 |---|---|
+| `get_timeline` | What the car did, in order: drives, charges, the time parked between them, and software updates, with places, battery %, kWh, and cost; answers "what did my car do on Saturday?" |
 | `get_state_history` | Per car and local day: hours online, asleep, and offline, driving and charging hours, idle awake hours (online while parked and not charging), and wake-ups |
 | `get_idle_awake_periods` | The online periods that kept the car awake while parked, longest first, with where it was parked; answers "why isn't my car sleeping?" |
 

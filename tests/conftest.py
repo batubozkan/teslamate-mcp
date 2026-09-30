@@ -67,7 +67,9 @@ CREATE TABLE drives (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAM
     power_max SMALLINT, power_min SMALLINT, start_km DOUBLE PRECISION, end_km DOUBLE PRECISION,
     inside_temp_avg DOUBLE PRECISION, outside_temp_avg DOUBLE PRECISION,
     start_address_id BIGINT, end_address_id BIGINT,
-    start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION);
+    start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION,
+    start_position_id INTEGER, end_position_id INTEGER,
+    start_geofence_id BIGINT, end_geofence_id BIGINT);
 CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAMP,
     end_date TIMESTAMP, charge_energy_added DOUBLE PRECISION, duration_min INTEGER,
     cost NUMERIC(10,2), address_id BIGINT, geofence_id BIGINT,
@@ -212,6 +214,10 @@ FROM drives d
     JOIN addresses sa ON sa.id = d.start_address_id
     JOIN addresses ea ON ea.id = d.end_address_id
     CROSS JOIN generate_series(0, 3) AS n
+WHERE d.car_id = 3;
+UPDATE drives d
+SET start_position_id = (SELECT p.id FROM positions p WHERE p.car_id = 3 AND p.date = d.start_date),
+    end_position_id = (SELECT p.id FROM positions p WHERE p.car_id = 3 AND p.date = d.end_date)
 WHERE d.car_id = 3;
 """
 

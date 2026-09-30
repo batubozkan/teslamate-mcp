@@ -19,6 +19,12 @@ All notable changes to this project are documented in this file. The format foll
   whose API token was revoked or that was sold) ends at the car's last logged
   position instead of running to now, and drives TeslaMate left open after a
   restart count neither as driving time nor as "driving now".
+- **`get_timeline`**: what the car did, in order — drives, charging sessions,
+  the time parked between them (with the share spent asleep or offline), and
+  software updates — with local times, places (geofence names first), battery
+  % at each end, kWh and cost. Defaults to the last 7 local days; a date range
+  shows any day. Parks are the gaps between activities, worked out over the
+  car's whole history, so a range never cuts a park short.
 
 ## [0.13.0] - 2026-09-30
 

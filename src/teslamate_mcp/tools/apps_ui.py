@@ -158,6 +158,80 @@ APP_SPECS: tuple[AppSpec, ...] = (
             "Find trip ids with get_trips."
         ),
     ),
+    AppSpec(
+        tool_name="show_charging_curve_comparison",
+        query_name="get_charging_curve_comparison",
+        base_uri="ui://teslamate/charging-curve-comparison.html",
+        html_file="charging_curve_comparison.html",
+        resource_name="charging_curve_comparison_chart",
+        resource_title="Charging curve comparison",
+        resource_description="Charging power by battery level for several sessions, overlaid.",
+        tool_description=(
+            "Render several charging sessions' curves overlaid in one interactive "
+            "chart, displayed directly in the conversation: charging power against "
+            "battery level, one line per session, with the highest peak and best "
+            "20-80% average called out, hover readouts, and a data table. Pass "
+            "charging_process_ids to compare specific sessions (e.g. a slow "
+            "Supercharger visit against a normal one), or leave it out to show the "
+            "latest DC sessions matching the filters. Returns the same rows as "
+            "get_charging_curve_comparison, so it also works as a plain data tool. "
+            "Find session ids with get_fast_charging_sessions."
+        ),
+    ),
+    AppSpec(
+        tool_name="show_activity_report",
+        query_name="get_activity_report",
+        base_uri="ui://teslamate/activity-report.html",
+        html_file="activity_report.html",
+        resource_name="activity_report_dashboard",
+        resource_title="Activity report",
+        resource_description="Monthly or yearly dashboard of driving, consumption, and charging.",
+        tool_description=(
+            "Render a monthly (per day) or yearly (per month) activity dashboard, "
+            "displayed directly in the conversation: totals for distance, drives, "
+            "driving time, consumption, energy charged, charging cost, and outside "
+            "temperature, with bar and line charts per day or month, hover "
+            "readouts, and a data table. Defaults to the current month; pass "
+            "period='year', year, or month for others. Returns the same rows as "
+            "get_activity_report, so it also works as a plain data tool. Prefer "
+            "this when the user asks for a monthly or yearly overview or recap."
+        ),
+    ),
+    AppSpec(
+        tool_name="show_visited_places",
+        query_name="get_visited_places",
+        base_uri="ui://teslamate/visited-places.html",
+        html_file="visited_places.html",
+        resource_name="visited_places_map",
+        resource_title="Visited places map",
+        resource_description="Map of the places the car parked at, sized by arrivals.",
+        tool_description=(
+            "Render a map of the places the car parked at, displayed directly in "
+            "the conversation: one circle per place sized by the number of "
+            "arrivals, places where it charged highlighted, hover readouts for "
+            "arrivals, hours parked, and charging, and a table of places. Returns "
+            "the same rows as get_visited_places, so it also works as a plain data "
+            "tool. Prefer this when the user wants to SEE where the car goes."
+        ),
+    ),
+    AppSpec(
+        tool_name="show_efficiency_vs_temperature",
+        query_name="get_drive_efficiency_points",
+        base_uri="ui://teslamate/efficiency-vs-temperature.html",
+        html_file="efficiency_vs_temperature.html",
+        resource_name="efficiency_vs_temperature_chart",
+        resource_title="Consumption by temperature",
+        resource_description="Scatter of each drive's consumption against outside temperature.",
+        tool_description=(
+            "Render a scatter chart of every drive's consumption (Wh/km) against "
+            "outside temperature, displayed directly in the conversation: one dot "
+            "per drive sized by distance and colored by car, the distance-weighted "
+            "average per 5 °C band, the cold-weather penalty (below 5 °C against "
+            "15-25 °C), hover readouts, and a table of bands. Returns the same rows "
+            "as get_drive_efficiency_points, so it also works as a plain data tool. "
+            "Prefer this when the user wants to SEE how temperature affects range."
+        ),
+    ),
 )
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri

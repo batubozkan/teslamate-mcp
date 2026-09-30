@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     custom_sql_row_limit: int = Field(
         default=1000,
         ge=1,
-        description="Default LIMIT injected into custom SQL queries when absent.",
+        description="Maximum number of rows run_sql returns, whatever LIMIT the query has.",
     )
 
     enable_charging_writes: bool = Field(
@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     map_tiles: bool = Field(
         default=True,
         description=(
-            "Draw a basemap (Esri gray canvas tiles) under the show_drive_route map. "
+            "Draw a basemap (Esri gray canvas tiles) under the route, trip, and places maps. "
             "Fetching tiles reveals the rough area being viewed to Esri; set "
             "false to keep the chart fully self-contained."
         ),

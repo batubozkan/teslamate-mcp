@@ -98,6 +98,10 @@ All notable changes to this project are documented in this file. The format foll
   a pending software update, which TeslaMate does not record, and says when
   TeslaMate has lost contact with the car. `backfill_costs_from_receipts`
   offers estimates for sessions without a receipt.
+- The README, Unraid template, `env.example`, and CONTRIBUTING.md match the
+  current tools, prompts, and charts (the README still said 30 report tools
+  and 3 charts), `MAP_TILES` is described as covering every map, and the
+  package URLs point to this fork, with the upstream project listed.
 - `get_most_visited_locations` documents `total_time_spent_min` as what it
   is, the driving time of drives starting or ending there, not time parked
   (`get_visited_places` has that).

@@ -25,11 +25,14 @@ This is a fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-m
 - "Show the route of my longest drive." — the server returns the GPS track, with an interactive map on chart-capable clients.
 - "Compare my driving this month with last month." — one call returns both windows, per metric.
 - "Can I reach Ankara (450 km) at 5°C without charging?" — the server estimates the arrival battery % from your own drives at that temperature.
+- "Why isn't my car sleeping?" — the server reads TeslaMate's state log and lists the periods the car stayed awake while parked.
+- "What did my car do on Saturday?" — one call returns the drives, charges, and parked time in order.
 
 ## Highlights
 
-- **30 SQL report tools.** Battery capacity and degradation, vampire drain, charging efficiency (AC vs DC), charging costs, geofences, driving patterns, routes, and search tools for drives and charging sessions.
-- **3 interactive charts (MCP Apps).** `show_charging_curve`, `show_battery_degradation`, and `show_drive_route` draw charts inside the conversation. On clients without chart support, the same tools return plain rows.
+- **47 SQL report tools.** Battery capacity and degradation, sleep and state history, a timeline of each day, trips, range estimates, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
+- **8 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
+- **Guidance for the assistant.** MCP instructions and 11 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
 - **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
 - **Safe custom SQL.** `run_sql` runs your `SELECT` inside a PostgreSQL `READ ONLY` transaction, with timeouts and a row cap. The transaction always rolls back.
 - **Optional cost writes, with confirmation.** One opt-in tool writes charging costs. A column-scoped database grant limits what it can touch. Clients with MCP elicitation show a confirmation dialog first.
@@ -218,7 +221,7 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Most rows `run_sql` returns, whatever its `LIMIT`           |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
-| `MAP_TILES`             | `true`      | Basemap under the `show_drive_route` map (Esri tiles)       |
+| `MAP_TILES`             | `true`      | Basemap under the route, trip, and places maps (Esri tiles) |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
 | `LOG_LEVEL`             | `INFO`      | Python log level                                            |
 | `DEBUG`                 | `false`     | Starlette debug mode; keep off in production                |
@@ -267,7 +270,7 @@ The startup validation rejects a query when a declared parameter is missing from
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
-- The route map's basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area of the drive being viewed. `MAP_TILES=false` turns this off.
+- The maps' basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area being viewed. `MAP_TILES=false` turns this off.
 - The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
 - Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
@@ -277,7 +280,7 @@ The startup validation rejects a query when a declared parameter is missing from
 uv sync                          # install with dev dependencies
 uv run ruff check src tests      # lint
 uv run ruff format src tests     # format
-uv run pytest                    # 152 tests; database tests need Docker or TESLAMATE_TEST_DATABASE_URL
+uv run pytest                    # database tests need Docker or TESLAMATE_TEST_DATABASE_URL (a scratch database)
 ```
 
 ## License

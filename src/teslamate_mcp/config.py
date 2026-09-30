@@ -75,6 +75,15 @@ class Settings(BaseSettings):
         ),
     )
 
+    map_tiles: bool = Field(
+        default=True,
+        description=(
+            "Draw a basemap (Esri gray canvas tiles) under the show_drive_route map. "
+            "Fetching tiles reveals the rough area being viewed to Esri; set "
+            "false to keep the chart fully self-contained."
+        ),
+    )
+
     report_timezone: str = Field(
         default="UTC",
         description="IANA timezone applied to date bucketing in predefined queries.",

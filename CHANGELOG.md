@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-30
+
+### Added
+- **Basemap under the route map.** `show_drive_route` now draws the track over
+  a low-detail basemap: Esri's gray canvas base layer, light or dark to match
+  the client, with the required attribution. The route is projected in Web
+  Mercator so it lines up with the tiles, gets a halo for contrast, and the
+  scale bar accounts for latitude. The view declares the tile host in
+  `_meta.ui.csp.resourceDomains`; if tiles fail to load, the plain route still
+  draws.
+- `MAP_TILES` setting (default `true`). Tiles are fetched by the viewer's
+  browser, which tells Esri the rough area being viewed; `MAP_TILES=false`
+  keeps the view fully self-contained. The setting is part of the view's URI
+  fingerprint, so toggling it never reuses a host's cached copy.
+
 ## [0.11.3] - 2026-09-30
 
 ### Fixed

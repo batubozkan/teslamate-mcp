@@ -9,7 +9,9 @@ from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.apps_ui import (
     APP_SPECS,
     CHARGING_CURVE_APP_URI,
+    MAP_TILE_HOST,
     _load_app_html,
+    _render_app_html,
     build_apps_extension,
 )
 
@@ -83,10 +85,47 @@ def test_app_uris_are_content_fingerprinted() -> None:
     for spec in APP_SPECS:
         match = re.fullmatch(r"ui://teslamate/([0-9a-f]{12})/([a-z-]+\.html)", spec.uri)
         assert match, spec.uri
-        html = _load_app_html(spec.html_file)
+        html = _render_app_html(spec.html_file, True)
         assert match.group(1) == hashlib.sha256(html.encode("utf-8")).hexdigest()[:12]
         assert spec.base_uri.endswith("/" + match.group(2))
     assert len({spec.uri for spec in APP_SPECS}) == len(APP_SPECS)
+
+
+async def _drive_route_resource(*, map_tiles: bool):
+    settings = Settings(database_url=_DUMMY_DB_URL, map_tiles=map_tiles)  # type: ignore[call-arg]
+    mcp = create_server(settings)
+    (resource,) = [r for r in await mcp.list_resources() if "drive-route" in str(r.uri)]
+    (content,) = await mcp.read_resource(str(resource.uri))
+    tool = next(t for t in await mcp.list_tools() if t.name == "show_drive_route")
+    return resource, content.content, tool
+
+
+@pytest.mark.asyncio
+async def test_map_tiles_on_declares_basemap_host() -> None:
+    resource, html, tool = await _drive_route_resource(map_tiles=True)
+    assert resource.meta["ui"]["csp"] == {"resourceDomains": [MAP_TILE_HOST]}
+    assert f'"{MAP_TILE_HOST}"' in html
+    assert "__MAP_TILE_HOST__" not in html
+    assert tool.meta["ui"]["resourceUri"] == str(resource.uri)
+
+
+@pytest.mark.asyncio
+async def test_map_tiles_off_keeps_view_self_contained() -> None:
+    resource, html, tool = await _drive_route_resource(map_tiles=False)
+    on_resource, _, _ = await _drive_route_resource(map_tiles=True)
+    assert "csp" not in resource.meta["ui"]
+    assert "https://" not in html
+    assert "__MAP_TILE_HOST__" not in html
+    # A settings change must not reuse a host's cached copy of the other variant.
+    assert str(resource.uri) != str(on_resource.uri)
+    assert tool.meta["ui"]["resourceUri"] == str(resource.uri)
+
+
+def test_only_the_route_view_uses_tiles() -> None:
+    for spec in APP_SPECS:
+        on = _render_app_html(spec.html_file, True)
+        uses = spec.tool_name == "show_drive_route"
+        assert ("https://" in on) is uses, spec.tool_name
 
 
 def test_missing_curve_query_fails_fast() -> None:
@@ -106,7 +145,10 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
             read = await session.read_resource(spec.uri)
             content = read.contents[0]
             assert content.mime_type == "text/html;profile=mcp-app"
-            assert content.meta == {"ui": {"prefersBorder": True}}
+            expected_ui: dict = {"prefersBorder": True}
+            if spec.tool_name == "show_drive_route":  # basemap tiles (MAP_TILES default on)
+                expected_ui["csp"] = {"resourceDomains": [MAP_TILE_HOST]}
+            assert content.meta == {"ui": expected_ui}
             # The document must speak the ext-apps handshake and render offline.
             for marker in (
                 "ui/initialize",
@@ -116,8 +158,9 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
                 "ui/resource-teardown",
             ):
                 assert marker in content.text, (spec.tool_name, marker)
-            # Self-contained: no external fetches.
-            assert "https://" not in content.text, spec.tool_name
+            # No external fetches beyond the declared basemap host.
+            external = content.text.replace(MAP_TILE_HOST, "")
+            assert "https://" not in external, spec.tool_name
 
 
 async def test_app_tools_match_their_plain_tools(mcp_session) -> None:

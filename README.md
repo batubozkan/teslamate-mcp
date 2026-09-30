@@ -131,7 +131,7 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 
 ### Charts (3)
 
-`show_charging_curve`, `show_battery_degradation`, and `show_drive_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool.
+`show_charging_curve`, `show_battery_degradation`, and `show_drive_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route map draws the track over a low-detail basemap (Esri gray canvas, light or dark to match the client). Set `MAP_TILES=false` to keep it fully offline.
 
 ### Custom (2)
 
@@ -168,6 +168,7 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Row cap added when `run_sql` has no `LIMIT`                 |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
+| `MAP_TILES`             | `true`      | Basemap under the `show_drive_route` map (Esri tiles)       |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
 | `LOG_LEVEL`             | `INFO`      | Python log level                                            |
 | `DEBUG`                 | `false`     | Starlette debug mode; keep off in production                |
@@ -216,6 +217,7 @@ The startup validation rejects a query when a declared parameter is missing from
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
+- The route map's basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area of the drive being viewed. `MAP_TILES=false` turns this off.
 - The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
 - Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 

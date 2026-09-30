@@ -14,10 +14,18 @@ from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
 
-from mcp.server.apps import Apps
+from mcp.server.apps import Apps, ResourceCsp
 from mcp.types import ToolAnnotations
 
 from .registry import PredefinedTool, make_query_handler
+
+# Basemap for the drive-route view: Esri's light/dark gray canvas base layers
+# (no labels, keyless), with the attribution the view draws. CARTO's keyless
+# basemaps now answer every request with a "key required" placeholder tile.
+# Fetching tiles tells Esri the rough area being viewed; MAP_TILES=false keeps
+# the view fully self-contained.
+MAP_TILE_HOST = "https://server.arcgisonline.com"
+_MAP_TILE_PLACEHOLDER = "__MAP_TILE_HOST__"
 
 
 @cache
@@ -25,9 +33,21 @@ def _load_app_html(filename: str) -> str:
     return files("teslamate_mcp").joinpath("apps", filename).read_text(encoding="utf-8")
 
 
+def _uses_map_tiles(filename: str) -> bool:
+    return _MAP_TILE_PLACEHOLDER in _load_app_html(filename)
+
+
 @cache
-def _html_fingerprint(filename: str) -> str:
-    return hashlib.sha256(_load_app_html(filename).encode("utf-8")).hexdigest()[:12]
+def _render_app_html(filename: str, map_tiles: bool) -> str:
+    """The view as served: the basemap host filled in, or "" when tiles are off."""
+    host = MAP_TILE_HOST if map_tiles else ""
+    return _load_app_html(filename).replace(_MAP_TILE_PLACEHOLDER, host)
+
+
+@cache
+def _html_fingerprint(filename: str, map_tiles: bool) -> str:
+    html = _render_app_html(filename, map_tiles)
+    return hashlib.sha256(html.encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -43,17 +63,21 @@ class AppSpec:
     resource_description: str
     tool_description: str
 
-    @property
-    def uri(self) -> str:
-        """The served `ui://` URI, fingerprinted with the view's content.
+    def uri_for(self, *, map_tiles: bool = True) -> str:
+        """The served `ui://` URI, fingerprinted with the view as served.
 
-        Hosts cache a view by its URI, so an unchanged URI kept serving a stale
-        copy after a server upgrade (claude.ai kept running a view whose
-        handshake a later release had fixed). A content hash in the path gives
-        every changed view a new URI and leaves unchanged ones cacheable.
+        Hosts may cache a view by its URI, so an unchanged URI can keep serving
+        a stale copy after a server upgrade or a settings change. A hash of the
+        served document in the path gives every changed view a new URI and
+        leaves unchanged ones cacheable.
         """
         scheme_host, _, name = self.base_uri.rpartition("/")
-        return f"{scheme_host}/{_html_fingerprint(self.html_file)}/{name}"
+        return f"{scheme_host}/{_html_fingerprint(self.html_file, map_tiles)}/{name}"
+
+    @property
+    def uri(self) -> str:
+        """The URI under default settings."""
+        return self.uri_for()
 
 
 APP_SPECS: tuple[AppSpec, ...] = (
@@ -132,7 +156,9 @@ LEGACY_RESOURCE_URI_META_KEY = "ui/resourceUri"
 # `_meta.ui.resourceUri` binding. Do not re-add the result-level link.
 
 
-def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -> Apps:
+def build_apps_extension(
+    tools: list[PredefinedTool], *, report_timezone: str, map_tiles: bool = True
+) -> Apps:
     """Build the Apps extension; pass the result to MCPServer(extensions=[...]).
 
     Each app tool reuses its backing query via make_query_handler, so the
@@ -160,19 +186,23 @@ def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -
         handler = make_query_handler(query, report_timezone=report_timezone)
         handler.__name__ = spec.tool_name
         handler.__doc__ = spec.tool_description
+        uri = spec.uri_for(map_tiles=map_tiles)
+        tiles = map_tiles and _uses_map_tiles(spec.html_file)
         apps.tool(
-            resource_uri=spec.uri,
-            meta={LEGACY_RESOURCE_URI_META_KEY: spec.uri},
+            resource_uri=uri,
+            meta={LEGACY_RESOURCE_URI_META_KEY: uri},
             name=spec.tool_name,
             description=spec.tool_description,
             annotations=annotations,
         )(handler)
         apps.add_html_resource(
-            spec.uri,
-            _load_app_html(spec.html_file),
+            uri,
+            _render_app_html(spec.html_file, map_tiles),
             name=spec.resource_name,
             title=spec.resource_title,
             description=spec.resource_description,
+            # Hosts deny all external loads unless declared; only images.
+            csp=ResourceCsp(resource_domains=[MAP_TILE_HOST]) if tiles else None,
             prefers_border=True,
         )
     return apps

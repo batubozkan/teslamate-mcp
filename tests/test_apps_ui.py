@@ -29,9 +29,12 @@ _APP_ARGS = {
     "show_drive_route": {"drive_id": _ROUTE_DRIVE_ID},
     "show_trip_route": {"trip_id": _TRIP_ID},
     "show_charging_curve_comparison": {},  # the base seed's DC session
+    "show_activity_report": {},  # every day of the current month, empty or not
+    "show_visited_places": {},
+    "show_efficiency_vs_temperature": {},
 }
-# Views that draw a basemap under a GPS track.
-_MAP_VIEWS = {"show_drive_route", "show_trip_route"}
+# Views that draw a basemap.
+_MAP_VIEWS = {"show_drive_route", "show_trip_route", "show_visited_places"}
 
 
 def test_every_app_spec_has_seeded_args() -> None:

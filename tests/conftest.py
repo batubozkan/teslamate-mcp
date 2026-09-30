@@ -100,8 +100,8 @@ CREATE TABLE states (id SERIAL PRIMARY KEY, car_id SMALLINT, state TEXT,
     start_date TIMESTAMP, end_date TIMESTAMP);
 
 INSERT INTO car_settings (id) VALUES (1), (2);
-INSERT INTO cars VALUES (1, 'Blue Thunder', 'model3', 'LR', 'DeepBlue', 'Model 3 LR', 1),
-                        (2, 'Red Rocket', 'modely', 'P', 'Red', 'Model Y P', 2);
+INSERT INTO cars VALUES (1, 'Blue Thunder', 'model3', 'LR', 'DeepBlue', 'Model 3 LR', 1, 0.15),
+                        (2, 'Red Rocket', 'modely', 'P', 'Red', 'Model Y P', 2, 0.16);
 INSERT INTO addresses VALUES
     (1, 'Home Street 1', 'Istanbul', 'TR-34', 41.0, 29.0),
     (2, 'Office Plaza', 'Istanbul', 'TR-34', 41.1, 29.1),
@@ -185,7 +185,7 @@ _TRIP_SQL = """
 -- overnight stop (with a hotel charge) ends it; drive 105 follows drive 104
 -- after a 45-min stop without charging, so it starts a trip of its own.
 INSERT INTO car_settings (id) VALUES (3);
-INSERT INTO cars VALUES (3, 'Road Tripper', 'modely', 'LR', 'White', 'Model Y LR', 3);
+INSERT INTO cars VALUES (3, 'Road Tripper', 'modely', 'LR', 'White', 'Model Y LR', 3, 0.16);
 INSERT INTO addresses VALUES
     (10, 'Bolu Rest Area', 'Bolu', 'TR-14', 40.73, 31.60),
     (11, 'Supercharger Bolu', 'Bolu', 'TR-14', 40.75, 31.62),

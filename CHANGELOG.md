@@ -62,6 +62,20 @@ All notable changes to this project are documented in this file. The format foll
     `get_drive_route` and `get_trip_route` report `elevation_m` per point.
   - `show_drive_route` and `show_trip_route` draw an elevation profile under
     the map, linked to it on hover.
+- **Three more charts**, each the MCP App of a new report:
+  - `show_activity_report` / `get_activity_report`: a month by day or a year
+    by month (distance, drives, consumption, kWh charged, cost, temperature),
+    with totals and empty days kept.
+  - `show_visited_places` / `get_visited_places`: a map of where the car
+    parks, sized by arrivals, with hours parked and charging per place.
+  - `show_efficiency_vs_temperature` / `get_drive_efficiency_points`: every
+    drive's consumption against outside temperature, sized by distance, with
+    the distance-weighted 5 °C average and the cold-weather penalty.
+
+### Changed
+- `get_most_visited_locations` documents `total_time_spent_min` as what it
+  is, the driving time of drives starting or ending there, not time parked
+  (`get_visited_places` has that).
 
 ### Fixed
 - **`get_charging_efficiency` counted many AC sessions as DC.** A session was

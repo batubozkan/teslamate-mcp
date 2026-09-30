@@ -158,6 +158,26 @@ APP_SPECS: tuple[AppSpec, ...] = (
             "Find trip ids with get_trips."
         ),
     ),
+    AppSpec(
+        tool_name="show_charging_curve_comparison",
+        query_name="get_charging_curve_comparison",
+        base_uri="ui://teslamate/charging-curve-comparison.html",
+        html_file="charging_curve_comparison.html",
+        resource_name="charging_curve_comparison_chart",
+        resource_title="Charging curve comparison",
+        resource_description="Charging power by battery level for several sessions, overlaid.",
+        tool_description=(
+            "Render several charging sessions' curves overlaid in one interactive "
+            "chart, displayed directly in the conversation: charging power against "
+            "battery level, one line per session, with the highest peak and best "
+            "20-80% average called out, hover readouts, and a data table. Pass "
+            "charging_process_ids to compare specific sessions (e.g. a slow "
+            "Supercharger visit against a normal one), or leave it out to show the "
+            "latest DC sessions matching the filters. Returns the same rows as "
+            "get_charging_curve_comparison, so it also works as a plain data tool. "
+            "Find session ids with get_fast_charging_sessions."
+        ),
+    ),
 )
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri

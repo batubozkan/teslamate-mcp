@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 45 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 49 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -160,9 +160,19 @@ TeslaMate ends a drive every time the car parks, so a road trip with a WC break 
 | `get_trip_details` | One trip's timeline: each drive, and each stop with where and how long, plus kWh and battery % for charging stops |
 | `get_trip_route` | GPS track of a whole trip across its drives, downsampled, with the stop before each leg |
 
-### Charts (4)
+### Fast charging (3)
 
-`show_charging_curve`, `show_battery_degradation`, `show_drive_route`, and `show_trip_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Set `MAP_TILES=false` to keep the maps fully offline.
+A session is DC when a sample came from a fast charger, or had no AC phases while power flowed; a Tesla-branded fast charger is a Supercharger.
+
+| Tool | What it returns |
+|---|---|
+| `get_fast_charging_sessions` | DC sessions with peak power, average power, average power across 20–80% (the fair comparison), minutes from 20% to 80%, whether the battery heater ran, and cost |
+| `get_fast_charging_by_location` | The same per location and charger type: which fast chargers are fastest and cheapest for your car |
+| `get_charging_curve_comparison` | Power against battery % for several sessions, for overlaying their curves |
+
+### Charts (5)
+
+`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, and `show_trip_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 

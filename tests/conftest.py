@@ -76,7 +76,8 @@ CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_d
     cost NUMERIC(10,2), address_id BIGINT, geofence_id BIGINT,
     start_battery_level SMALLINT, end_battery_level SMALLINT,
     charge_energy_used DOUBLE PRECISION,
-    start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION);
+    start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION,
+    outside_temp_avg DOUBLE PRECISION);
 CREATE TABLE charges (id SERIAL PRIMARY KEY, charging_process_id INTEGER, date TIMESTAMP,
     battery_level SMALLINT, charger_power SMALLINT, charger_voltage INTEGER,
     charger_actual_current SMALLINT, charger_phases SMALLINT,
@@ -350,11 +351,57 @@ FROM charging_processes cp
 WHERE cp.id BETWEEN 301 AND 307;
 """
 
+# Car 11 ("Sparky") for the fast-charging tools:
+#   401 Supercharger, 10% -> 85% in 76 one-minute samples: 150 kW up to 50%,
+#       then 3 kW less per percent (45 kW at 85%)
+#   402 third-party DC, 30% -> 60% at a flat 60 kW, battery heater on at first
+#   403 AC at 11 kW that ends on a 0 kW sample with no phases, the sample that
+#       used to make AC sessions count as DC
+_FAST_SQL = """
+INSERT INTO car_settings (id) VALUES (11);
+INSERT INTO cars VALUES (11, 'Sparky', 'model3', 'LR', 'Blue', 'Model 3 LR', 11, 0.15);
+INSERT INTO addresses VALUES
+    (30, 'Tesla Supercharger Gebze', 'Gebze', 'TR-41', 40.8, 29.4),
+    (31, 'Outlet DC Charger', 'Izmit', 'TR-41', 40.76, 29.9),
+    (32, 'Sparky Garage', 'Izmit', 'TR-41', 40.77, 29.95);
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    charge_energy_used, duration_min, cost, address_id, start_battery_level,
+    end_battery_level) VALUES
+    (401, 11, date_trunc('minute', now()) - interval '5 days',
+     date_trunc('minute', now()) - interval '5 days' + interval '76 min',
+     76.0, 80.0, 76, 38.00, 30, 10, 85),
+    (402, 11, date_trunc('minute', now()) - interval '2 days',
+     date_trunc('minute', now()) - interval '2 days' + interval '31 min',
+     25.0, 27.0, 31, NULL, 31, 30, 60),
+    (403, 11, date_trunc('minute', now()) - interval '1 day',
+     date_trunc('minute', now()) - interval '1 day' + interval '22 min',
+     10.0, 12.0, 22, NULL, 32, 40, 60);
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases,
+    fast_charger_present, fast_charger_brand, fast_charger_type, battery_heater_on)
+SELECT 401, cp.start_date + make_interval(mins => n), 10 + n,
+    CASE WHEN 10 + n <= 50 THEN 150 ELSE 150 - (10 + n - 50) * 3 END,
+    NULL::int, TRUE, 'Tesla', 'Combo', FALSE
+FROM charging_processes cp CROSS JOIN generate_series(0, 75) AS n WHERE cp.id = 401
+UNION ALL
+SELECT 402, cp.start_date + make_interval(mins => n), 30 + n, 60, NULL, TRUE, '<invalid>',
+    'Combo', n < 10
+FROM charging_processes cp CROSS JOIN generate_series(0, 30) AS n WHERE cp.id = 402
+UNION ALL
+SELECT 403, cp.start_date + make_interval(mins => n), 40 + n, 11, 3, FALSE, NULL,
+    'ACSingleWireCAN', FALSE
+FROM charging_processes cp CROSS JOIN generate_series(0, 20) AS n WHERE cp.id = 403
+UNION ALL
+SELECT 403, cp.start_date + interval '22 min', 60, 0, NULL, FALSE, NULL, 'ACSingleWireCAN',
+    FALSE
+FROM charging_processes cp WHERE cp.id = 403;
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
     "estimate": _ESTIMATE_SQL,
     "costs": _COST_SQL,
+    "fast": _FAST_SQL,
 }
 
 

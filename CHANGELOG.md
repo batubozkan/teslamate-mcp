@@ -44,8 +44,23 @@ All notable changes to this project are documented in this file. The format foll
   have no cost (or an `electricity_price_per_kwh` to price them).
 - `get_charging_costs` and `get_charging_by_geofence` report
   `sessions_without_cost`.
+- **Fast-charging analytics** from the charges' fast-charger fields, which no
+  tool read before.
+  - `get_fast_charging_sessions`: DC sessions with charger type (Supercharger
+    or third-party), connector, peak and average power, average power across
+    20–80%, minutes from 20% to 80%, whether the battery heater ran, and cost.
+  - `get_fast_charging_by_location`: the same per location and charger type,
+    with the price paid per kWh.
+  - `get_charging_curve_comparison` and the `show_charging_curve_comparison`
+    MCP App: several sessions' power against battery %, overlaid, so a slow
+    session can be told apart from a cold or full battery.
 
 ### Fixed
+- **`get_charging_efficiency` counted many AC sessions as DC.** A session was
+  DC when any sample had no charger phases, but AC sessions often end on a
+  0 kW sample with no phases (39 of 218 sessions on a real database). DC now
+  needs a sample from a fast charger, or one with no phases while power
+  flowed; every tool that splits AC from DC uses that same test.
 - **Average cost per kWh was too low whenever some sessions had no cost.**
   `get_charging_costs` and `get_charging_by_geofence` divided the recorded
   costs by the energy of every session, so each session with no cost counted

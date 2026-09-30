@@ -100,6 +100,8 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 
 Tools return metric values (km, km/h, °C, bar, m) and rated range. `get_unit_preferences` reads the units chosen in TeslaMate's settings (km or mi, °C or °F, bar or psi, rated or ideal range) so the assistant can convert when it answers; the charts stay metric.
 
+The server also sends MCP `instructions`: how to read units, time zones and costs, and which tool answers which kind of question.
+
 ### Reports (22)
 
 | Group | Tools |

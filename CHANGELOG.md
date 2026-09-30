@@ -78,6 +78,13 @@ All notable changes to this project are documented in this file. The format foll
   where the user asked TeslaMate for them. Tools keep returning metric values
   and rated range; the charts stay metric.
 
+- **Server instructions.** The server now sends MCP `instructions`: units
+  and rated range, UTC timestamps against the configured `REPORT_TIMEZONE`,
+  unknown costs, and a short map from kind of question to tool (trips vs
+  drives, sleep, range planning, charging, costs, overviews, charts vs their
+  data twins). `set_charging_cost` is mentioned only when writes are enabled;
+  a test keeps every tool it names registered.
+
 ### Changed
 - `get_most_visited_locations` documents `total_time_spent_min` as what it
   is, the driving time of drives starting or ending there, not time parked

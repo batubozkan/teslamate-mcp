@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-30
+
 ### Added
 - **Trips.** TeslaMate ends a drive every time the car parks, so one journey
   with a WC break and a charging stop is several drives. Three new tools

@@ -51,7 +51,7 @@ INSERT INTO demo_cars (name, battery_kwh) VALUES
     ('Model 3', 75.00),
     ('Model Y', 82.50);
 
-DROP TABLE IF EXISTS charges, charging_processes, drives, positions, updates,
+DROP TABLE IF EXISTS charges, charging_processes, drives, positions, updates, states,
     addresses, geofences, car_settings, cars CASCADE;
 CREATE TABLE car_settings (id BIGINT PRIMARY KEY, enabled BOOLEAN DEFAULT TRUE,
     free_supercharging BOOLEAN DEFAULT FALSE);
@@ -82,10 +82,14 @@ CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
     ideal_battery_range_km DOUBLE PRECISION, est_battery_range_km DOUBLE PRECISION,
     odometer DOUBLE PRECISION, outside_temp DOUBLE PRECISION, is_climate_on BOOLEAN,
-    speed SMALLINT, power SMALLINT,
+    speed SMALLINT, power SMALLINT, drive_id INTEGER,
     tpms_pressure_fl DOUBLE PRECISION, tpms_pressure_fr DOUBLE PRECISION,
     tpms_pressure_rl DOUBLE PRECISION, tpms_pressure_rr DOUBLE PRECISION);
 CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
+    start_date TIMESTAMP, end_date TIMESTAMP);
+-- TeslaMate's state column is an enum (online, offline, asleep); the queries
+-- compare it as text, so TEXT stands in for it here.
+CREATE TABLE states (id SERIAL PRIMARY KEY, car_id SMALLINT, state TEXT,
     start_date TIMESTAMP, end_date TIMESTAMP);
 
 INSERT INTO car_settings (id) VALUES (1), (2);
@@ -164,8 +168,8 @@ INSERT INTO updates (car_id, version, start_date, end_date) VALUES
 """
 
 
-# Opt-in extra seed (mcp_session(with_trips=True)), kept apart so the fleet-wide
-# totals the other tests assert on stay unchanged.
+# Opt-in extra seeds (mcp_session(seeds=[...]), or with_trips=True for "trips"),
+# kept apart so the fleet-wide totals the other tests assert on stay unchanged.
 _TRIP_SQL = """
 -- Road trip for car 3 (fixed UTC dates), for the trip tools. With the default
 -- limits (30 min plain stop, 120 min charging stop) drives 101-103 form one
@@ -210,6 +214,66 @@ FROM drives d
     CROSS JOIN generate_series(0, 3) AS n
 WHERE d.car_id = 3;
 """
+
+# Cars 4-7 for the state tools. Car 4's states are laid out from UTC midnight
+# two days ago (D) so day buckets are deterministic under the default UTC
+# REPORT_TIMEZONE:
+#   day D:   online 00:00-02:30, asleep from 02:30
+#   day D+1: asleep until 06:00, online 06:00-09:00 (a 30-min drive and a
+#            30-min charge inside it), offline 09:00-24:00
+#   today:   asleep since midnight (open state)
+# Car 4 also has an orphaned open drive (no end_date), which must not count as
+# driving time. Car 5 is driving now and car 6 is charging now. Car 7's online
+# state has been open since D, but TeslaMate last logged a position at D 01:00,
+# during an orphaned open drive: it must read as online, not driving.
+_STATE_SQL = """
+INSERT INTO car_settings (id) VALUES (4), (5), (6), (7);
+INSERT INTO cars VALUES (4, 'Night Owl', 'model3', 'SR', 'White', 'Model 3 SR', 4),
+                        (5, 'Road Runner', 'model3', 'LR', 'Grey', 'Model 3 LR', 5),
+                        (6, 'Plug Star', 'modely', 'LR', 'Black', 'Model Y LR', 6),
+                        (7, 'Ghost Car', 'models', 'P', 'Silver', 'Model S P', 7);
+CREATE TEMP TABLE base AS
+    SELECT date_trunc('day', now() AT TIME ZONE 'UTC') - interval '2 days' AS d,
+        now() AT TIME ZONE 'UTC' AS utc_now;
+INSERT INTO states (car_id, state, start_date, end_date)
+SELECT v.car_id, v.state, base.d + v.start_off, base.d + v.end_off
+FROM base
+    CROSS JOIN (VALUES
+        (4, 'online', interval '0 hours', interval '2.5 hours'),
+        (4, 'asleep', interval '2.5 hours', interval '30 hours'),
+        (4, 'online', interval '30 hours', interval '33 hours'),
+        (4, 'offline', interval '33 hours', interval '48 hours'),
+        (4, 'asleep', interval '48 hours', NULL::interval),
+        (7, 'online', interval '0 hours', NULL::interval)
+    ) AS v(car_id, state, start_off, end_off);
+INSERT INTO states (car_id, state, start_date, end_date)
+SELECT 5, 'online', utc_now - interval '20 minutes', NULL::timestamp FROM base
+UNION ALL SELECT 6, 'online', utc_now - interval '2 hours', NULL FROM base;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, start_address_id,
+    end_address_id, start_rated_range_km, end_rated_range_km)
+SELECT 201, 4, d + interval '31 hours', d + interval '31.5 hours', 20.0, 30, 1, 2, 300.0, 290.0
+FROM base
+UNION ALL SELECT 202, 4, d + interval '1 hour', NULL, NULL, NULL, 1, NULL, 310.0, NULL FROM base
+UNION ALL SELECT 203, 5, utc_now - interval '10 minutes', NULL, NULL, NULL, 2, NULL, 400.0, NULL
+FROM base
+UNION ALL SELECT 204, 7, d + interval '0.5 hours', NULL, NULL, NULL, 1, NULL, 350.0, NULL FROM base;
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    duration_min, address_id, start_battery_level, end_battery_level)
+SELECT 201, 4, d + interval '32 hours', d + interval '32.5 hours', 5.0, 30, 2, 60, 66 FROM base
+UNION ALL SELECT 202, 6, utc_now - interval '1 hour', NULL, NULL, NULL, 1, 40, NULL FROM base;
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases)
+SELECT 202, utc_now - interval '5 minutes', 55, 11, 3 FROM base;
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, drive_id)
+SELECT 4, d + interval '33 hours', 41.1, 29.1, 66, NULL FROM base
+UNION ALL SELECT 5, utc_now - interval '1 minute', 41.05, 29.05, 78, 203 FROM base
+UNION ALL SELECT 6, utc_now - interval '5 minutes', 41.0, 29.0, 55, NULL FROM base
+UNION ALL SELECT 7, d + interval '1 hour', 41.0, 29.0, 70, 204 FROM base;
+-- Open online states end at the car's last position with an ideal range.
+UPDATE positions SET ideal_battery_range_km = 300.0 WHERE car_id IN (4, 5, 6, 7);
+DROP TABLE base;
+"""
+
+_EXTRA_SEEDS = {"trips": _TRIP_SQL, "states": _STATE_SQL}
 
 
 @pytest.fixture(scope="session")
@@ -280,16 +344,19 @@ def mcp_session(seeded_database):
 
     Runs the full MCPServer stack (lifespan, pool, tool dispatch) without HTTP.
     Accepts Settings overrides, e.g. mcp_session(report_timezone="Europe/Istanbul"),
-    and with_trips=True to add the car-3 road trip (_TRIP_SQL).
+    and seeds=[...] naming extra seeds from _EXTRA_SEEDS (with_trips=True is
+    shorthand for seeds=["trips"], the car-3 road trip).
     """
 
     @asynccontextmanager
-    async def factory(*, elicitation_callback=None, with_trips=False, **overrides):
-        if with_trips:
+    async def factory(*, elicitation_callback=None, with_trips=False, seeds=(), **overrides):
+        extra = [*seeds, *(["trips"] if with_trips else [])]
+        if extra:
             async with await psycopg.AsyncConnection.connect(
                 seeded_database, autocommit=True
             ) as conn:
-                await conn.execute(_TRIP_SQL)
+                for name in extra:
+                    await conn.execute(_EXTRA_SEEDS[name])
         settings = Settings(database_url=seeded_database, **overrides)  # type: ignore[call-arg]
         mcp = create_server(settings)
         try:

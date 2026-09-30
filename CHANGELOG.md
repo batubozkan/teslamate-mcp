@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **Sleep and wake analysis** from TeslaMate's `states` table, which no tool
+  read before.
+  - `get_state_history`: per car and local day, hours online, asleep and
+    offline, driving and charging hours, idle awake hours (online while parked
+    and not charging, the time that drains the battery), wake-ups, and the
+    share of the day asleep or offline. Intervals are split at local midnight.
+  - `get_idle_awake_periods`: the online periods that kept the car awake while
+    parked, longest idle time first, with where the car was parked.
+  - `get_current_car_status` now reports `car_state` (driving, charging,
+    online, asleep, or offline) and `car_state_since`.
+  An online state that TeslaMate never closed (it loses contact with a car
+  whose API token was revoked or that was sold) ends at the car's last logged
+  position instead of running to now, and drives TeslaMate left open after a
+  restart count neither as driving time nor as "driving now".
+
 ## [0.13.0] - 2026-09-30
 
 ### Added

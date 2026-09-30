@@ -24,6 +24,7 @@ _REQUIRED_ARG_SEEDS = {
     "drive_id": _TZ_BOUNDARY_DRIVE_ID,
     "charging_process_id": _CURVE_SESSION_ID,
     "trip_id": _TZ_BOUNDARY_DRIVE_ID,  # any drive id resolves to its trip
+    "distance_km": 100,
 }
 
 
@@ -297,11 +298,11 @@ async def test_schema_tool_compact_and_detail(mcp_session) -> None:
     async with mcp_session() as session:
         compact = rows_from(await session.call_tool("get_database_schema", {}))
         cars_row = next(r for r in compact if r["table_name"] == "cars")
-        assert cars_row["column_count"] == 7
+        assert cars_row["column_count"] == 8
         assert all("column_name" not in r for r in compact)
 
         detail = rows_from(await session.call_tool("get_database_schema", {"table": "cars"}))
-        assert len(detail) == 7
+        assert len(detail) == 8
         assert all(r["table_name"] == "cars" and "data_type" in r for r in detail)
 
         unknown = await session.call_tool("get_database_schema", {"table": "not_a_table"})

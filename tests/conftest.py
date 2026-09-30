@@ -56,7 +56,8 @@ DROP TABLE IF EXISTS charges, charging_processes, drives, positions, updates, st
 CREATE TABLE car_settings (id BIGINT PRIMARY KEY, enabled BOOLEAN DEFAULT TRUE,
     free_supercharging BOOLEAN DEFAULT FALSE);
 CREATE TABLE cars (id SMALLINT PRIMARY KEY, name TEXT, model TEXT, trim_badging TEXT,
-    exterior_color TEXT, marketing_name TEXT, settings_id BIGINT REFERENCES car_settings(id));
+    exterior_color TEXT, marketing_name TEXT, settings_id BIGINT REFERENCES car_settings(id),
+    efficiency DOUBLE PRECISION);
 CREATE TABLE addresses (id BIGINT PRIMARY KEY, display_name TEXT, city TEXT, state TEXT,
     latitude DOUBLE PRECISION, longitude DOUBLE PRECISION);
 CREATE TABLE geofences (id BIGINT PRIMARY KEY, name TEXT, latitude DOUBLE PRECISION,
@@ -74,7 +75,8 @@ CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_d
     end_date TIMESTAMP, charge_energy_added DOUBLE PRECISION, duration_min INTEGER,
     cost NUMERIC(10,2), address_id BIGINT, geofence_id BIGINT,
     start_battery_level SMALLINT, end_battery_level SMALLINT,
-    charge_energy_used DOUBLE PRECISION);
+    charge_energy_used DOUBLE PRECISION,
+    start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION);
 CREATE TABLE charges (id SERIAL PRIMARY KEY, charging_process_id INTEGER, date TIMESTAMP,
     battery_level SMALLINT, charger_power SMALLINT, charger_voltage INTEGER,
     charger_actual_current SMALLINT, charger_phases SMALLINT,
@@ -279,7 +281,32 @@ UPDATE positions SET ideal_battery_range_km = 300.0 WHERE car_id IN (4, 5, 6, 7)
 DROP TABLE base;
 """
 
-_EXTRA_SEEDS = {"trips": _TRIP_SQL, "states": _STATE_SQL}
+# Car 8 for get_trip_energy_estimate, efficiency 0.15 kWh per rated km:
+#   5 city drives at 20°C: 10 km, 10 rated km used -> 150 Wh/km
+#   5 city drives at 0°C: 10 km, 14 rated km used -> 210 Wh/km
+#   5 motorway drives at 20°C: 100 km in 60 min, 120 rated km used -> 180 Wh/km
+# and charges adding 4 rated km per battery percent (0.6 kWh, 60 kWh full).
+_ESTIMATE_SQL = """
+INSERT INTO car_settings (id) VALUES (8);
+INSERT INTO cars VALUES (8, 'Planner', 'model3', 'LR', 'Blue', 'Model 3 LR', 8, 0.15);
+INSERT INTO drives (car_id, start_date, end_date, distance, duration_min, outside_temp_avg,
+    start_rated_range_km, end_rated_range_km)
+SELECT 8, now() - make_interval(days => n), now() - make_interval(days => n)
+        + make_interval(mins => v.minutes),
+    v.km, v.minutes, v.temp, 400.0, 400.0 - v.rated_used
+FROM generate_series(1, 5) AS n
+    CROSS JOIN (VALUES (10.0, 20, 20.0, 10.0), (10.0, 20, 0.0, 14.0), (100.0, 60, 20.0, 120.0))
+        AS v(km, minutes, temp, rated_used);
+INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
+    start_battery_level, end_battery_level, start_rated_range_km, end_rated_range_km)
+SELECT 8, now() - make_interval(days => n, hours => 12),
+    now() - make_interval(days => n, hours => 11), 36.0, 20, 80, 80.0, 320.0
+FROM generate_series(1, 3) AS n;
+INSERT INTO positions (car_id, date, battery_level, ideal_battery_range_km)
+VALUES (8, now() - interval '10 minutes', 80, 330.0);
+"""
+
+_EXTRA_SEEDS = {"trips": _TRIP_SQL, "states": _STATE_SQL, "estimate": _ESTIMATE_SQL}
 
 
 @pytest.fixture(scope="session")

@@ -25,6 +25,14 @@ All notable changes to this project are documented in this file. The format foll
   % at each end, kWh and cost. Defaults to the last 7 local days; a date range
   shows any day. Parks are the gaps between activities, worked out over the
   car's whole history, so a range never cuts a park short.
+- **`get_trip_energy_estimate`** ("will I make it?"): energy and battery % a
+  drive of a given distance will take, learned from the car's own drives at a
+  similar outside temperature (within 3°C, widening until there is enough
+  history), optionally motorway drives only. Returns expected and
+  conservative (90th percentile) consumption, usable capacity, full-battery
+  range, and the arrival battery % from the latest recorded level or a given
+  one. Consumption and capacity both come from the rated-range scale, so they
+  stay consistent with each other.
 
 ## [0.13.0] - 2026-09-30
 

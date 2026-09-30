@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 42 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 43 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -24,6 +24,7 @@ This is a fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-m
 - "How much range do I lose while parked?" — the server finds vampire drain between drives.
 - "Show the route of my longest drive." — the server returns the GPS track, with an interactive map on chart-capable clients.
 - "Compare my driving this month with last month." — one call returns both windows, per metric.
+- "Can I reach Ankara (450 km) at 5°C without charging?" — the server estimates the arrival battery % from your own drives at that temperature.
 
 ## Highlights
 
@@ -107,7 +108,7 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 | Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_unusual_power_consumption` |
 | Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
 
-### Insights (6)
+### Insights (7)
 
 | Tool | What it returns |
 |---|---|
@@ -117,6 +118,7 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 | `get_charging_by_geofence` | Charging totals per TeslaMate geofence, plus an "Ungeofenced" group |
 | `get_soc_hygiene` | Share of samples above 80% and below 20% state of charge |
 | `get_period_comparison` | The last N days vs the N days before, one row per metric |
+| `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only), with a conservative figure and the arrival battery % |
 
 ### Timeline and car state (3)
 

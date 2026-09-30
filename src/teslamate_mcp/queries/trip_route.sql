@@ -75,6 +75,7 @@ route AS (
         p.battery_level,
         p.speed,
         p.odometer,
+        p.elevation,
         t.leg,
         t.drive_id,
         CASE
@@ -101,7 +102,8 @@ SELECT ROW_NUMBER() OVER (ORDER BY MIN(date)) AS point_order,
     ROUND(AVG(longitude)::numeric, 6) AS longitude,
     MIN(battery_level) AS battery_level,
     MAX(speed) AS speed_max_kmh,
-    MAX(odometer) AS odometer_km
+    MAX(odometer) AS odometer_km,
+    ROUND(AVG(elevation))::int AS elevation_m
 FROM route
 GROUP BY leg, bucket
 ORDER BY point_order;

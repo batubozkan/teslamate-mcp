@@ -54,6 +54,14 @@ All notable changes to this project are documented in this file. The format foll
   - `get_charging_curve_comparison` and the `show_charging_curve_comparison`
     MCP App: several sessions' power against battery %, overlaid, so a slow
     session can be told apart from a cold or full battery.
+- **Elevation**, which TeslaMate records but no tool read.
+  - `get_efficiency_by_elevation`: consumption by net climb per km (downhill
+    to uphill), per car, against the car's flat drives. Net climb (ascent
+    minus descent) because GPS noise inflates ascent and descent alike.
+  - `get_drive_details` and `get_trips` report `ascent_m` and `descent_m`;
+    `get_drive_route` and `get_trip_route` report `elevation_m` per point.
+  - `show_drive_route` and `show_trip_route` draw an elevation profile under
+    the map, linked to it on hover.
 
 ### Fixed
 - **`get_charging_efficiency` counted many AC sessions as DC.** A session was

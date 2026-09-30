@@ -70,7 +70,7 @@ CREATE TABLE drives (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAM
     start_address_id BIGINT, end_address_id BIGINT,
     start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION,
     start_position_id INTEGER, end_position_id INTEGER,
-    start_geofence_id BIGINT, end_geofence_id BIGINT);
+    start_geofence_id BIGINT, end_geofence_id BIGINT, ascent SMALLINT, descent SMALLINT);
 CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAMP,
     end_date TIMESTAMP, charge_energy_added DOUBLE PRECISION, duration_min INTEGER,
     cost NUMERIC(10,2), address_id BIGINT, geofence_id BIGINT,
@@ -89,7 +89,7 @@ CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
     ideal_battery_range_km DOUBLE PRECISION, est_battery_range_km DOUBLE PRECISION,
     odometer DOUBLE PRECISION, outside_temp DOUBLE PRECISION, is_climate_on BOOLEAN,
-    speed SMALLINT, power SMALLINT, drive_id INTEGER,
+    speed SMALLINT, power SMALLINT, drive_id INTEGER, elevation SMALLINT,
     tpms_pressure_fl DOUBLE PRECISION, tpms_pressure_fr DOUBLE PRECISION,
     tpms_pressure_rl DOUBLE PRECISION, tpms_pressure_rr DOUBLE PRECISION);
 CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
@@ -165,11 +165,12 @@ INSERT INTO positions (car_id, date, battery_level, usable_battery_level) VALUES
     (2, now() - interval '40 hours', 85, 84);
 -- Route points inside the fixed TZ-boundary drive (id 4), for get_drive_route.
 INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_battery_level,
-    odometer, speed, power)
+    odometer, speed, power, elevation)
 SELECT 1, TIMESTAMP '2026-01-15 22:30:00' + (n * 3 || ' minutes')::interval,
        41.0 + 0.007 * n, 29.0 + 0.005 * n, 80 - n, 79 - n,
-       800.0 + 3.8 * n, 40 + 5 * n, 20 + n
+       800.0 + 3.8 * n, 40 + 5 * n, 20 + n, 100 + 10 * n
 FROM generate_series(0, 11) AS n;
+UPDATE drives SET ascent = 120, descent = 10 WHERE id = 4;
 INSERT INTO updates (car_id, version, start_date, end_date) VALUES
     (1, '2026.20.1', now() - interval '5 days', now() - interval '5 days' + interval '25 min');
 """
@@ -208,13 +209,14 @@ INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_
     (101, 3, TIMESTAMP '2025-06-10 08:45', TIMESTAMP '2025-06-10 09:25', 35.0, 40, 11, 30, 75),
     (102, 3, TIMESTAMP '2025-06-10 20:00', TIMESTAMP '2025-06-11 06:00', 40.0, 600, 12, 45, 95);
 -- Four track points per trip drive: start, two in between, end.
-INSERT INTO positions (car_id, date, latitude, longitude, battery_level, speed)
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, speed, elevation)
 SELECT 3, d.start_date + (d.end_date - d.start_date) * (n / 3.0),
        sa.latitude + (ea.latitude - sa.latitude) * (n / 3.0),
        sa.longitude + (ea.longitude - sa.longitude) * (n / 3.0),
        (d.start_rated_range_km - (d.start_rated_range_km - d.end_rated_range_km) * (n / 3.0))
            / 5.0,
-       60 + 10 * n
+       60 + 10 * n,
+       100 + 250 * (d.id - 101) + 60 * n
 FROM drives d
     JOIN addresses sa ON sa.id = d.start_address_id
     JOIN addresses ea ON ea.id = d.end_address_id
@@ -222,7 +224,9 @@ FROM drives d
 WHERE d.car_id = 3;
 UPDATE drives d
 SET start_position_id = (SELECT p.id FROM positions p WHERE p.car_id = 3 AND p.date = d.start_date),
-    end_position_id = (SELECT p.id FROM positions p WHERE p.car_id = 3 AND p.date = d.end_date)
+    end_position_id = (SELECT p.id FROM positions p WHERE p.car_id = 3 AND p.date = d.end_date),
+    ascent = 100,
+    descent = 50
 WHERE d.car_id = 3;
 """
 
@@ -284,22 +288,24 @@ UPDATE positions SET ideal_battery_range_km = 300.0 WHERE car_id IN (4, 5, 6, 7)
 DROP TABLE base;
 """
 
-# Car 8 for get_trip_energy_estimate, efficiency 0.15 kWh per rated km:
-#   5 city drives at 20°C: 10 km, 10 rated km used -> 150 Wh/km
-#   5 city drives at 0°C: 10 km, 14 rated km used -> 210 Wh/km
-#   5 motorway drives at 20°C: 100 km in 60 min, 120 rated km used -> 180 Wh/km
+# Car 8 for get_trip_energy_estimate and get_efficiency_by_elevation,
+# efficiency 0.15 kWh per rated km:
+#   5 city drives at 20°C: 10 km, 10 rated km used -> 150 Wh/km, 50 m net descent
+#   5 city drives at 0°C: 10 km, 14 rated km used -> 210 Wh/km, 150 m net climb
+#   5 motorway drives at 20°C: 100 km in 60 min, 120 rated km used -> 180 Wh/km, flat
 # and charges adding 4 rated km per battery percent (0.6 kWh, 60 kWh full).
 _ESTIMATE_SQL = """
 INSERT INTO car_settings (id) VALUES (8);
 INSERT INTO cars VALUES (8, 'Planner', 'model3', 'LR', 'Blue', 'Model 3 LR', 8, 0.15);
 INSERT INTO drives (car_id, start_date, end_date, distance, duration_min, outside_temp_avg,
-    start_rated_range_km, end_rated_range_km)
+    start_rated_range_km, end_rated_range_km, ascent, descent)
 SELECT 8, now() - make_interval(days => n), now() - make_interval(days => n)
         + make_interval(mins => v.minutes),
-    v.km, v.minutes, v.temp, 400.0, 400.0 - v.rated_used
+    v.km, v.minutes, v.temp, 400.0, 400.0 - v.rated_used, v.ascent, v.descent
 FROM generate_series(1, 5) AS n
-    CROSS JOIN (VALUES (10.0, 20, 20.0, 10.0), (10.0, 20, 0.0, 14.0), (100.0, 60, 20.0, 120.0))
-        AS v(km, minutes, temp, rated_used);
+    CROSS JOIN (VALUES (10.0, 20, 20.0, 10.0, 20, 70), (10.0, 20, 0.0, 14.0, 160, 10),
+                       (100.0, 60, 20.0, 120.0, 1000, 1000))
+        AS v(km, minutes, temp, rated_used, ascent, descent);
 INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
     start_battery_level, end_battery_level, start_rated_range_km, end_rated_range_km)
 SELECT 8, now() - make_interval(days => n, hours => 12),

@@ -1,5 +1,5 @@
 name = "get_trips"
-description = "Group drives into trips. TeslaMate ends a drive every time the car parks, so one journey (e.g. Istanbul to Ankara with a WC break and a Supercharger stop) is several drives; this merges consecutive drives of a car while each stop in between stays short: up to max_stop_minutes (default 30) without charging, or max_charging_stop_minutes (default 120) when a charging session happened during the stop. Returns one row per trip: trip_id (use with get_trip_details and show_trip_route), start/end time and place, legs, stops and charging stops, distance km, driving vs stopped vs total minutes, average moving speed, battery % at start and end, kWh added during the trip, rated range used, average outside temperature. Newest first by default; 20 rows by default. Filter on the trip's local start date, car, distance, number of legs, or a place the trip passed through."
+description = "Group drives into trips. TeslaMate ends a drive every time the car parks, so one journey (e.g. Istanbul to Ankara with a WC break and a Supercharger stop) is several drives; this merges consecutive drives of a car while each stop in between stays short: up to max_stop_minutes (default 30) without charging, or max_charging_stop_minutes (default 120) when a charging session happened during the stop. Returns one row per trip: trip_id (use with get_trip_details and show_trip_route), start/end time and place, legs, stops and charging stops, distance km, driving vs stopped vs total minutes, average moving speed, battery % at start and end, kWh added during the trip, rated range used, average outside temperature, ascent and descent m. Newest first by default; 20 rows by default. Filter on the trip's local start date, car, distance, number of legs, or a place the trip passed through."
 
 [[params]]
 name = "car_name"
@@ -166,3 +166,12 @@ description = "Rated range consumed while driving (sum over the legs; charging e
 name = "outside_temp_avg"
 type = "number"
 description = "Driving-time-weighted average outside temperature (degrees C)."
+
+[[output]]
+name = "ascent_m"
+type = "integer"
+description = "Total climb over the trip's drives, in meters (inflated by GPS elevation noise)."
+
+[[output]]
+name = "descent_m"
+type = "integer"

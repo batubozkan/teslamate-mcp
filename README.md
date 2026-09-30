@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 49 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 50 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -98,14 +98,14 @@ The guide includes the exact dashboard fields, verification commands for each ph
 
 Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `limit`, and thresholds where they apply. A call with no arguments returns the full report.
 
-### Reports (18)
+### Reports (19)
 
 | Group | Tools |
 |---|---|
 | Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history` |
 | Battery | `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends` |
 | Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day` |
-| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_unusual_power_consumption` |
+| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_unusual_power_consumption` |
 | Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
 
 ### Insights (7)
@@ -172,7 +172,7 @@ A session is DC when a sample came from a fast charger, or had no AC phases whil
 
 ### Charts (5)
 
-`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, and `show_trip_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Set `MAP_TILES=false` to keep the maps fully offline.
+`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, and `show_trip_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Both maps draw an elevation profile under the track; hovering it finds the place on the map. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 

@@ -11,7 +11,9 @@ WITH scope AS (
         d.start_rated_range_km,
         d.end_rated_range_km,
         d.start_address_id,
-        d.end_address_id
+        d.end_address_id,
+        d.ascent,
+        d.descent
     FROM drives d
         JOIN cars c ON c.id = d.car_id
     WHERE d.end_date IS NOT NULL
@@ -75,6 +77,8 @@ summary AS (
         COALESCE(SUM(t.stop_before_min) FILTER (WHERE t.starts_trip = 0), 0) AS stopped_min,
         MAX(t.speed_max) AS speed_max_kmh,
         SUM(t.start_rated_range_km - t.end_rated_range_km) AS rated_range_used_km,
+        SUM(t.ascent) AS ascent_m,
+        SUM(t.descent) AS descent_m,
         SUM(t.outside_temp_avg * t.duration_min) FILTER (WHERE t.outside_temp_avg IS NOT NULL)
             / NULLIF(SUM(t.duration_min) FILTER (WHERE t.outside_temp_avg IS NOT NULL), 0)
             AS outside_temp_avg,
@@ -130,7 +134,9 @@ SELECT f.trip_id,
     last_pos.battery_level AS end_battery_level,
     ROUND(energy.added_kwh::numeric, 1) AS energy_added_kwh,
     ROUND(f.rated_range_used_km::numeric, 1) AS rated_range_used_km,
-    ROUND(f.outside_temp_avg::numeric, 1) AS outside_temp_avg
+    ROUND(f.outside_temp_avg::numeric, 1) AS outside_temp_avg,
+    f.ascent_m,
+    f.descent_m
 FROM filtered f
     LEFT JOIN addresses sa ON sa.id = f.start_address_id
     LEFT JOIN addresses ea ON ea.id = f.end_address_id

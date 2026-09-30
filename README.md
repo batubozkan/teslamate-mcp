@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 56 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -98,11 +98,13 @@ The guide includes the exact dashboard fields, verification commands for each ph
 
 Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `limit`, and thresholds where they apply. A call with no arguments returns the full report.
 
-### Reports (21)
+Tools return metric values (km, km/h, °C, bar, m) and rated range. `get_unit_preferences` reads the units chosen in TeslaMate's settings (km or mi, °C or °F, bar or psi, rated or ideal range) so the assistant can convert when it answers; the charts stay metric.
+
+### Reports (22)
 
 | Group | Tools |
 |---|---|
-| Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history` |
+| Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`, `get_unit_preferences` |
 | Battery | `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends` |
 | Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`, `get_visited_places` |
 | Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |

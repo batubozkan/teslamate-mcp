@@ -52,7 +52,7 @@ INSERT INTO demo_cars (name, battery_kwh) VALUES
     ('Model Y', 82.50);
 
 DROP TABLE IF EXISTS charges, charging_processes, drives, positions, updates, states,
-    addresses, geofences, car_settings, cars CASCADE;
+    settings, addresses, geofences, car_settings, cars CASCADE;
 CREATE TABLE car_settings (id BIGINT PRIMARY KEY, enabled BOOLEAN DEFAULT TRUE,
     free_supercharging BOOLEAN DEFAULT FALSE);
 CREATE TABLE cars (id SMALLINT PRIMARY KEY, name TEXT, model TEXT, trim_badging TEXT,
@@ -98,6 +98,11 @@ CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
 -- compare it as text, so TEXT stands in for it here.
 CREATE TABLE states (id SERIAL PRIMARY KEY, car_id SMALLINT, state TEXT,
     start_date TIMESTAMP, end_date TIMESTAMP);
+-- TeslaMate's settings row; its unit columns are enums there, text here.
+CREATE TABLE settings (id BIGSERIAL PRIMARY KEY, unit_of_length TEXT, unit_of_temperature TEXT,
+    unit_of_pressure TEXT, preferred_range TEXT, language TEXT);
+INSERT INTO settings (unit_of_length, unit_of_temperature, unit_of_pressure, preferred_range,
+    language) VALUES ('mi', 'F', 'psi', 'ideal', 'en');
 
 INSERT INTO car_settings (id) VALUES (1), (2);
 INSERT INTO cars VALUES (1, 'Blue Thunder', 'model3', 'LR', 'DeepBlue', 'Model 3 LR', 1, 0.15),

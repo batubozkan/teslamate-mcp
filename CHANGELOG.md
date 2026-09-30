@@ -72,6 +72,12 @@ All notable changes to this project are documented in this file. The format foll
     drive's consumption against outside temperature, sized by distance, with
     the distance-weighted 5 °C average and the cold-weather penalty.
 
+- **`get_unit_preferences`**: the units chosen in TeslaMate's settings
+  (length, temperature, pressure, rated or ideal range), with the conversion
+  factors in its description, so the assistant answers in miles, °F, or psi
+  where the user asked TeslaMate for them. Tools keep returning metric values
+  and rated range; the charts stay metric.
+
 ### Changed
 - `get_most_visited_locations` documents `total_time_spent_min` as what it
   is, the driving time of drives starting or ending there, not time parked

@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 11 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -183,6 +183,10 @@ A session is DC when a sample came from a fast charger, or had no AC phases whil
 
 - `get_database_schema` — lists all tables, shows the columns of one table, and re-reads the schema when you pass `refresh=true`.
 - `run_sql` — runs one custom `SELECT` or `WITH … SELECT`.
+
+### Prompts (11)
+
+Ready-made workflows that name the tools to call, in order: `status_report`, `summarize_driving`, `analyze_battery_health`, `analyze_charging`, `find_anomalies`, `weather_efficiency`, `diagnose_sleep`, `plan_trip`, `review_trip`, `monthly_recap`, and `charging_costs_and_savings`. With cost writes on, `backfill_costs_from_receipts` joins them.
 
 ### Cost writes (opt-in, off by default)
 

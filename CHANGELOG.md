@@ -85,7 +85,19 @@ All notable changes to this project are documented in this file. The format foll
   data twins). `set_charging_cost` is mentioned only when writes are enabled;
   a test keeps every tool it names registered.
 
+- **Five new prompts**: `diagnose_sleep`, `plan_trip` (destination and
+  temperature arguments), `review_trip`, `monthly_recap`, and
+  `charging_costs_and_savings`.
+
 ### Changed
+- **Prompts use the newer tools.** `analyze_battery_health` starts from the
+  energy-based capacity trend and looks at charging habits, `analyze_charging`
+  fills in missing costs and compares fast chargers, `find_anomalies` checks
+  sleep and hills, `summarize_driving` reports journeys, and
+  `weather_efficiency` plots every drive. `status_report` no longer asks for
+  a pending software update, which TeslaMate does not record, and says when
+  TeslaMate has lost contact with the car. `backfill_costs_from_receipts`
+  offers estimates for sessions without a receipt.
 - `get_most_visited_locations` documents `total_time_spent_min` as what it
   is, the driving time of drives starting or ending there, not time parked
   (`get_visited_places` has that).

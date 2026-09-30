@@ -80,7 +80,9 @@ CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_d
 CREATE TABLE charges (id SERIAL PRIMARY KEY, charging_process_id INTEGER, date TIMESTAMP,
     battery_level SMALLINT, charger_power SMALLINT, charger_voltage INTEGER,
     charger_actual_current SMALLINT, charger_phases SMALLINT,
-    rated_battery_range_km DOUBLE PRECISION, outside_temp DOUBLE PRECISION);
+    rated_battery_range_km DOUBLE PRECISION, outside_temp DOUBLE PRECISION,
+    fast_charger_present BOOLEAN, fast_charger_brand TEXT, fast_charger_type TEXT,
+    conn_charge_cable TEXT, battery_heater_on BOOLEAN);
 CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     latitude DOUBLE PRECISION, longitude DOUBLE PRECISION, battery_level SMALLINT,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
@@ -306,7 +308,54 @@ INSERT INTO positions (car_id, date, battery_level, ideal_battery_range_km)
 VALUES (8, now() - interval '10 minutes', 80, 330.0);
 """
 
-_EXTRA_SEEDS = {"trips": _TRIP_SQL, "states": _STATE_SQL, "estimate": _ESTIMATE_SQL}
+# Cars 9 ("Penny") and 10 ("Freebie", free Supercharging) for the cost tools.
+# Penny paid 0.50 and 0.60 per billed kWh at the Bursa Supercharger (billed =
+# the larger of kWh used and kWh added); its sessions 303-305 have no cost.
+# The base seed adds one costed AC session (0.3788/kWh) and one costed
+# third-party DC session (0.5556/kWh) that serve as charger-type history.
+_COST_SQL = """
+INSERT INTO car_settings (id, free_supercharging) VALUES (9, FALSE), (10, TRUE);
+INSERT INTO cars VALUES (9, 'Penny', 'model3', 'SR', 'Red', 'Model 3 SR', 9, 0.14),
+                        (10, 'Freebie', 'models', 'LR', 'Black', 'Model S LR', 10, 0.18);
+INSERT INTO addresses VALUES
+    (20, 'Tesla Supercharger Bursa', 'Bursa', 'TR-16', 40.2, 29.0),
+    (21, 'Mall DC Charger', 'Bursa', 'TR-16', 40.21, 29.05),
+    (22, 'Garage Plug', 'Bursa', 'TR-16', 40.22, 29.1);
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    charge_energy_used, duration_min, cost, address_id) VALUES
+    (301, 9, now() - interval '30 days', now() - interval '30 days' + interval '30 min',
+     38.0, 40.0, 30, 20.00, 20),
+    (302, 9, now() - interval '20 days', now() - interval '20 days' + interval '30 min',
+     38.0, 40.0, 30, 24.00, 20),
+    (303, 9, now() - interval '10 days', now() - interval '10 days' + interval '25 min',
+     28.0, 30.0, 25, NULL, 20),
+    (304, 9, now() - interval '8 days', now() - interval '8 days' + interval '20 min',
+     19.0, 20.0, 20, NULL, 21),
+    (305, 9, now() - interval '6 days', now() - interval '6 days' + interval '60 min',
+     10.0, 11.0, 60, NULL, 22),
+    (306, 10, now() - interval '5 days', now() - interval '5 days' + interval '30 min',
+     30.0, 31.0, 30, NULL, 20),
+    (307, 9, now() - interval '4 days', now() - interval '4 days' + interval '1 min',
+     0.0, 0.0, 1, NULL, 22);
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases,
+    fast_charger_present, fast_charger_brand, fast_charger_type)
+SELECT cp.id, cp.start_date + interval '1 min', 50, v.power, v.phases, v.present, v.brand,
+    v.kind
+FROM charging_processes cp
+    JOIN (VALUES
+        (20, 120, NULL::int, TRUE, 'Tesla', 'Combo'),
+        (21, 90, NULL::int, TRUE, '<invalid>', 'Combo'),
+        (22, 11, 3, FALSE, NULL, 'ACSingleWireCAN')
+    ) AS v(address_id, power, phases, present, brand, kind) ON v.address_id = cp.address_id
+WHERE cp.id BETWEEN 301 AND 307;
+"""
+
+_EXTRA_SEEDS = {
+    "trips": _TRIP_SQL,
+    "states": _STATE_SQL,
+    "estimate": _ESTIMATE_SQL,
+    "costs": _COST_SQL,
+}
 
 
 @pytest.fixture(scope="session")

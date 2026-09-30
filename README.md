@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 43 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 45 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -130,7 +130,7 @@ TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_
 | `get_state_history` | Per car and local day: hours online, asleep, and offline, driving and charging hours, idle awake hours (online while parked and not charging), and wake-ups |
 | `get_idle_awake_periods` | The online periods that kept the car awake while parked, longest first, with where it was parked; answers "why isn't my car sleeping?" |
 
-### Search and detail (6)
+### Search and detail (5)
 
 | Tool | What it returns |
 |---|---|
@@ -139,7 +139,16 @@ TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_
 | `get_drive_details` | Full statistics for one drive |
 | `get_drive_route` | GPS track points for one drive, downsampled |
 | `get_charging_curve` | Power and SOC curve for one charging session, downsampled |
-| `get_charging_costs` | Costs grouped by month, location, or car |
+
+### Costs (3)
+
+A session with no cost recorded counts as unknown, not free: averages per kWh use only the sessions that have a cost, and each report says how many sessions lack one.
+
+| Tool | What it returns |
+|---|---|
+| `get_charging_costs` | Costs grouped by month, location, or car, with the number of sessions that have no cost |
+| `get_charging_cost_estimates` | An estimated cost for each session with none: free Supercharging, a price you give, the geofence tariff, what you paid at the same place, or the typical price for that charger type |
+| `get_fuel_savings` | What the same distance would have cost in fuel, against what charging cost, per car |
 
 ### Trips (3)
 

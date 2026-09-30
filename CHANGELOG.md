@@ -33,6 +33,23 @@ All notable changes to this project are documented in this file. The format foll
   range, and the arrival battery % from the latest recorded level or a given
   one. Consumption and capacity both come from the rated-range scale, so they
   stay consistent with each other.
+- **`get_charging_cost_estimates`**: an estimated cost for every charging
+  session with none recorded, from the first basis that applies: free
+  Supercharging, a `price_per_kwh` argument, the session's geofence tariff,
+  the median price paid at the same address (nearest sessions in time), or
+  the median price for the same charger type (Supercharger, other DC, AC).
+  Pairs with `set_charging_cost` to backfill.
+- **`get_fuel_savings`**: the fuel the same distance would have taken and
+  cost, against what charging cost, with a coverage figure when some sessions
+  have no cost (or an `electricity_price_per_kwh` to price them).
+- `get_charging_costs` and `get_charging_by_geofence` report
+  `sessions_without_cost`.
+
+### Fixed
+- **Average cost per kWh was too low whenever some sessions had no cost.**
+  `get_charging_costs` and `get_charging_by_geofence` divided the recorded
+  costs by the energy of every session, so each session with no cost counted
+  as free charging. The average now covers only sessions that have a cost.
 
 ## [0.13.0] - 2026-09-30
 

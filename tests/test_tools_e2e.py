@@ -25,6 +25,7 @@ _REQUIRED_ARG_SEEDS = {
     "charging_process_id": _CURVE_SESSION_ID,
     "trip_id": _TZ_BOUNDARY_DRIVE_ID,  # any drive id resolves to its trip
     "distance_km": 100,
+    "fuel_price_per_liter": 2.0,
 }
 
 
@@ -146,6 +147,10 @@ async def test_charging_costs_group_by(mcp_session) -> None:
             await session.call_tool("get_charging_costs", {"group_by": "location"})
         )
         assert {r["group_key"] for r in by_location} == {"Home Street 1", "Supercharger Edirne"}
+        home = next(r for r in by_location if r["group_key"] == "Home Street 1")
+        # 12.50 over the 30 kWh that has a cost, not over all 50 kWh charged there.
+        assert (home["total_cost"], home["sessions_without_cost"]) == (12.5, 1)
+        assert home["avg_cost_per_kwh"] == 0.4167
 
 
 async def test_battery_capacity_trend(mcp_session) -> None:
@@ -210,7 +215,10 @@ async def test_charging_by_geofence_buckets(mcp_session) -> None:
         assert set(buckets) == {"Home", "Ungeofenced"}
         assert buckets["Home"]["sessions"] == 2
         assert buckets["Home"]["kwh_added"] == 50.0
-        assert buckets["Home"]["avg_cost_per_kwh"] == 0.25  # 12.50 / 50 kWh
+        # 12.50 / 30 kWh: Red Rocket's 20 kWh at Home has no cost, so it is
+        # unknown rather than free and stays out of the average.
+        assert buckets["Home"]["avg_cost_per_kwh"] == 0.417
+        assert buckets["Home"]["sessions_without_cost"] == 1
 
         blue_only = rows_from(
             await session.call_tool("get_charging_by_geofence", {"car_name": "blue"})

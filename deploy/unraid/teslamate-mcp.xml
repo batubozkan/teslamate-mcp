@@ -54,6 +54,6 @@
           Description="statement_timeout (ms) applied to run_sql custom queries."
           Type="Variable" Display="advanced" Required="false" Mask="false">5000</Config>
   <Config Name="CUSTOM_SQL_ROW_LIMIT" Target="CUSTOM_SQL_ROW_LIMIT" Default="1000" Mode=""
-          Description="Row cap injected into run_sql queries that lack an explicit LIMIT."
+          Description="Most rows run_sql returns, whatever LIMIT the query has."
           Type="Variable" Display="advanced" Required="false" Mask="false">1000</Config>
 </Container>

@@ -212,7 +212,7 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `POOL_MAX_SIZE`         | `10`        | Maximum pool connections                                    |
 | `STATEMENT_TIMEOUT_MS`  | `30000`     | `statement_timeout` for every query, including reports      |
 | `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
-| `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Row cap added when `run_sql` has no `LIMIT`                 |
+| `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Most rows `run_sql` returns, whatever its `LIMIT`           |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
 | `MAP_TILES`             | `true`      | Basemap under the `show_drive_route` map (Esri tiles)       |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |

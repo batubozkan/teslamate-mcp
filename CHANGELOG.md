@@ -91,6 +91,12 @@ All notable changes to this project are documented in this file. The format foll
   (`get_visited_places` has that).
 
 ### Fixed
+- **`run_sql`'s row cap could be bypassed** (a known limitation in
+  SECURITY.md): the query was wrapped in `LIMIT` only when it had no `LIMIT`
+  of its own, so `SELECT * FROM (SELECT … LIMIT 5000000) x` ran uncapped.
+  The query now runs through a server-side cursor and at most
+  `CUSTOM_SQL_ROW_LIMIT` rows are fetched, whatever it says; the rest never
+  leave PostgreSQL. The tool description states the cap.
 - **`get_charging_efficiency` counted many AC sessions as DC.** A session was
   DC when any sample had no charger phases, but AC sessions often end on a
   0 kW sample with no phases (39 of 218 sessions on a real database). DC now

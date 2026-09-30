@@ -336,3 +336,22 @@ async def test_schema_refresh_picks_up_live_ddl(mcp_session, seeded_database) ->
         finally:
             await conn.execute("DROP TABLE IF EXISTS post_boot_table")
             await conn.close()
+
+
+async def test_run_sql_row_cap_holds_against_its_own_limit(mcp_session) -> None:
+    async with mcp_session(custom_sql_row_limit=25) as session:
+        capped = rows_from(
+            await session.call_tool(
+                "run_sql", {"query": "SELECT n FROM generate_series(1, 500) AS n LIMIT 400"}
+            )
+        )
+        under = rows_from(
+            await session.call_tool("run_sql", {"query": "SELECT id FROM cars ORDER BY id;"})
+        )
+        rejected = await session.call_tool("run_sql", {"query": "DELETE FROM cars"})
+        tools = {t.name: t for t in (await session.list_tools()).tools}
+
+    assert len(capped) == 25
+    assert [r["id"] for r in under] == [1, 2]
+    assert rejected.is_error
+    assert "at most 25 rows" in tools["run_sql"].description

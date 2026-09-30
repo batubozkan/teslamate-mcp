@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     custom_sql_row_limit: int = Field(
         default=1000,
         ge=1,
-        description="Default LIMIT injected into custom SQL queries when absent.",
+        description="Maximum number of rows run_sql returns, whatever LIMIT the query has.",
     )
 
     enable_charging_writes: bool = Field(

@@ -1,12 +1,19 @@
-"""Shared pytest fixtures. Integration tests require a Docker daemon."""
+"""Shared pytest fixtures.
+
+Integration tests need PostgreSQL: a Docker daemon (testcontainers), or an
+existing server named by TESLAMATE_TEST_DATABASE_URL. The seed SQL drops and
+recreates its tables, so point that at a scratch database, never TeslaMate's.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import psycopg
 import pytest
 import pytest_asyncio
 
@@ -157,14 +164,66 @@ INSERT INTO updates (car_id, version, start_date, end_date) VALUES
 """
 
 
+# Opt-in extra seed (mcp_session(with_trips=True)), kept apart so the fleet-wide
+# totals the other tests assert on stay unchanged.
+_TRIP_SQL = """
+-- Road trip for car 3 (fixed UTC dates), for the trip tools. With the default
+-- limits (30 min plain stop, 120 min charging stop) drives 101-103 form one
+-- trip: a 20-min WC stop, then a 70-min stop containing a 40-min charge. The
+-- overnight stop (with a hotel charge) ends it; drive 105 follows drive 104
+-- after a 45-min stop without charging, so it starts a trip of its own.
+INSERT INTO car_settings (id) VALUES (3);
+INSERT INTO cars VALUES (3, 'Road Tripper', 'modely', 'LR', 'White', 'Model Y LR', 3);
+INSERT INTO addresses VALUES
+    (10, 'Bolu Rest Area', 'Bolu', 'TR-14', 40.73, 31.60),
+    (11, 'Supercharger Bolu', 'Bolu', 'TR-14', 40.75, 31.62),
+    (12, 'Kizilay Square', 'Ankara', 'TR-06', 39.92, 32.85),
+    (13, 'Ankara Office', 'Ankara', 'TR-06', 39.95, 32.80);
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, speed_max,
+    outside_temp_avg, start_address_id, end_address_id, start_rated_range_km,
+    end_rated_range_km) VALUES
+    (101, 3, TIMESTAMP '2025-06-10 06:00', TIMESTAMP '2025-06-10 07:30', 140.0, 90, 125,
+     20.0, 1, 10, 450.0, 340.0),
+    (102, 3, TIMESTAMP '2025-06-10 07:50', TIMESTAMP '2025-06-10 08:40', 70.0, 50, 120,
+     22.0, 10, 11, 340.0, 285.0),
+    (103, 3, TIMESTAMP '2025-06-10 09:50', TIMESTAMP '2025-06-10 11:20', 150.0, 90, 130,
+     26.0, 11, 12, 420.0, 300.0),
+    (104, 3, TIMESTAMP '2025-06-11 10:00', TIMESTAMP '2025-06-11 10:20', 15.0, 20, 70,
+     24.0, 12, 13, 470.0, 458.0),
+    (105, 3, TIMESTAMP '2025-06-11 11:05', TIMESTAMP '2025-06-11 11:25', 14.0, 20, 65,
+     25.0, 13, 12, 458.0, 447.0);
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    duration_min, address_id, start_battery_level, end_battery_level) VALUES
+    (101, 3, TIMESTAMP '2025-06-10 08:45', TIMESTAMP '2025-06-10 09:25', 35.0, 40, 11, 30, 75),
+    (102, 3, TIMESTAMP '2025-06-10 20:00', TIMESTAMP '2025-06-11 06:00', 40.0, 600, 12, 45, 95);
+-- Four track points per trip drive: start, two in between, end.
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, speed)
+SELECT 3, d.start_date + (d.end_date - d.start_date) * (n / 3.0),
+       sa.latitude + (ea.latitude - sa.latitude) * (n / 3.0),
+       sa.longitude + (ea.longitude - sa.longitude) * (n / 3.0),
+       (d.start_rated_range_km - (d.start_rated_range_km - d.end_rated_range_km) * (n / 3.0))
+           / 5.0,
+       60 + 10 * n
+FROM drives d
+    JOIN addresses sa ON sa.id = d.start_address_id
+    JOIN addresses ea ON ea.id = d.end_address_id
+    CROSS JOIN generate_series(0, 3) AS n
+WHERE d.car_id = 3;
+"""
+
+
 @pytest.fixture(scope="session")
 def postgres_container():
     """Start a single Postgres container for the test session.
 
-    Returns the container instance, or skips all integration tests when Docker
+    Returns the container instance (None when TESLAMATE_TEST_DATABASE_URL
+    points at an existing server), or skips all integration tests when Docker
     is unavailable. Sharing one container across the session keeps test
     startup time bounded.
     """
+    if os.environ.get("TESLAMATE_TEST_DATABASE_URL"):
+        yield None
+        return
     if not _HAS_TESTCONTAINERS:
         pytest.skip("testcontainers is not installed")
     try:
@@ -180,6 +239,8 @@ def postgres_container():
 
 @pytest.fixture(scope="session")
 def database_url(postgres_container) -> str:
+    if postgres_container is None:
+        return os.environ["TESLAMATE_TEST_DATABASE_URL"]
     return postgres_container.get_connection_url().replace(
         "postgresql+psycopg2://", "postgresql://"
     )
@@ -218,11 +279,17 @@ def mcp_session(seeded_database):
     """Factory: an initialized in-memory MCP client against a real server.
 
     Runs the full MCPServer stack (lifespan, pool, tool dispatch) without HTTP.
-    Accepts Settings overrides, e.g. mcp_session(report_timezone="Europe/Istanbul").
+    Accepts Settings overrides, e.g. mcp_session(report_timezone="Europe/Istanbul"),
+    and with_trips=True to add the car-3 road trip (_TRIP_SQL).
     """
 
     @asynccontextmanager
-    async def factory(*, elicitation_callback=None, **overrides):
+    async def factory(*, elicitation_callback=None, with_trips=False, **overrides):
+        if with_trips:
+            async with await psycopg.AsyncConnection.connect(
+                seeded_database, autocommit=True
+            ) as conn:
+                await conn.execute(_TRIP_SQL)
         settings = Settings(database_url=seeded_database, **overrides)  # type: ignore[call-arg]
         mcp = create_server(settings)
         try:

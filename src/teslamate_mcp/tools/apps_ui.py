@@ -137,6 +137,27 @@ APP_SPECS: tuple[AppSpec, ...] = (
             "wants to SEE the route. Find drive ids with search_drives."
         ),
     ),
+    AppSpec(
+        tool_name="show_trip_route",
+        query_name="get_trip_route",
+        base_uri="ui://teslamate/trip-route.html",
+        html_file="trip_route.html",
+        resource_name="trip_route_map",
+        resource_title="Trip route map",
+        resource_description=(
+            "Interactive map of a multi-drive trip with its stops and charging stops."
+        ),
+        tool_description=(
+            "Render an interactive map of a whole trip (several drives with "
+            "stops in between), displayed directly in the conversation: the "
+            "full GPS track, start/end markers, a marker at every stop with "
+            "charging stops highlighted, hover readouts for time, leg, speed, "
+            "battery and stop length, and a waypoint table. Returns the same "
+            "rows as get_trip_route, so it also works as a plain data tool. "
+            "Prefer this over get_trip_route when the user wants to SEE a trip. "
+            "Find trip ids with get_trips."
+        ),
+    ),
 )
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri

@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **Trips.** TeslaMate ends a drive every time the car parks, so one journey
+  with a WC break and a charging stop is several drives. Three new tools
+  merge a car's consecutive drives while each stop in between stays short:
+  up to `max_stop_minutes` (default 30) without charging, or
+  `max_charging_stop_minutes` (default 120) when a charging session happened
+  during the stop.
+  - `get_trips`: one row per trip with legs, stops and charging stops,
+    distance, driving/stopped/total time, moving speed, battery % at start
+    and end, kWh added on the way, rated range used, and average outside
+    temperature. Filters: dates, car, distance, number of legs, and a place
+    the trip passed through (any leg's start or end, not only the endpoints).
+  - `get_trip_details`: one trip's timeline of drives and stops, with where
+    and how long each stop lasted and, for charging stops, kWh added and
+    battery % before and after.
+  - `get_trip_route` and the `show_trip_route` MCP App: the whole trip on the
+    basemap, with a marker at every stop and charging stops highlighted.
+  All three share one grouping block (a test keeps the copies identical), and
+  `trip_id` is the trip's first drive id; any drive id in the trip also works.
+  Unlike Grafana's Continuous Trips dashboard, which splits at every charge,
+  a charging stop on the way stays part of the trip.
+
+### Changed
+- Tests can run against an existing PostgreSQL via
+  `TESLAMATE_TEST_DATABASE_URL` instead of Docker (point it at a scratch
+  database; the seed drops and recreates its tables).
+
 ## [0.12.0] - 2026-09-30
 
 ### Added

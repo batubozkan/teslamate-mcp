@@ -20,7 +20,11 @@ from teslamate_mcp.tools.registry import discover_predefined_tools
 # Seeded ids from conftest._SETUP_SQL (SERIAL columns reset on every reseed).
 _TZ_BOUNDARY_DRIVE_ID = 4  # 2026-01-15 22:30 UTC = 2026-01-16 01:30 Europe/Istanbul
 _CURVE_SESSION_ID = 1  # 30 charge points, battery 50..79
-_REQUIRED_ARG_SEEDS = {"drive_id": _TZ_BOUNDARY_DRIVE_ID, "charging_process_id": _CURVE_SESSION_ID}
+_REQUIRED_ARG_SEEDS = {
+    "drive_id": _TZ_BOUNDARY_DRIVE_ID,
+    "charging_process_id": _CURVE_SESSION_ID,
+    "trip_id": _TZ_BOUNDARY_DRIVE_ID,  # any drive id resolves to its trip
+}
 
 
 def rows_from(result) -> list[dict[str, Any]]:

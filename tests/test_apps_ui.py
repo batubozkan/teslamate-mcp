@@ -20,13 +20,17 @@ _DUMMY_DB_URL = "postgresql://teslamate:secret@example.test/teslamate"
 # Seeded ids from conftest._SETUP_SQL.
 _CURVE_SESSION_ID = 1  # 30 charge points, battery 50..79
 _ROUTE_DRIVE_ID = 4  # fixed-date drive with 12 seeded track points
+_TRIP_ID = 101  # the car-3 road trip (mcp_session(with_trips=True))
 
 # Arguments that produce rows for each app tool against the seeded database.
 _APP_ARGS = {
     "show_charging_curve": {"charging_process_id": _CURVE_SESSION_ID, "max_points": 10},
     "show_battery_degradation": {},
     "show_drive_route": {"drive_id": _ROUTE_DRIVE_ID},
+    "show_trip_route": {"trip_id": _TRIP_ID},
 }
+# Views that draw a basemap under a GPS track.
+_MAP_VIEWS = {"show_drive_route", "show_trip_route"}
 
 
 def test_every_app_spec_has_seeded_args() -> None:
@@ -121,11 +125,10 @@ async def test_map_tiles_off_keeps_view_self_contained() -> None:
     assert tool.meta["ui"]["resourceUri"] == str(resource.uri)
 
 
-def test_only_the_route_view_uses_tiles() -> None:
+def test_only_the_map_views_use_tiles() -> None:
     for spec in APP_SPECS:
         on = _render_app_html(spec.html_file, True)
-        uses = spec.tool_name == "show_drive_route"
-        assert ("https://" in on) is uses, spec.tool_name
+        assert ("https://" in on) is (spec.tool_name in _MAP_VIEWS), spec.tool_name
 
 
 def test_missing_curve_query_fails_fast() -> None:
@@ -146,7 +149,7 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
             content = read.contents[0]
             assert content.mime_type == "text/html;profile=mcp-app"
             expected_ui: dict = {"prefersBorder": True}
-            if spec.tool_name == "show_drive_route":  # basemap tiles (MAP_TILES default on)
+            if spec.tool_name in _MAP_VIEWS:  # basemap tiles (MAP_TILES default on)
                 expected_ui["csp"] = {"resourceDomains": [MAP_TILE_HOST]}
             assert content.meta == {"ui": expected_ui}
             # The document must speak the ext-apps handshake and render offline.
@@ -164,7 +167,7 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
 
 
 async def test_app_tools_match_their_plain_tools(mcp_session) -> None:
-    async with mcp_session() as session:
+    async with mcp_session(with_trips=True) as session:
         for spec in APP_SPECS:
             args = _APP_ARGS[spec.tool_name]
             app_result = await session.call_tool(spec.tool_name, args)
@@ -195,7 +198,7 @@ async def test_app_tool_results_carry_no_resource_link(mcp_session) -> None:
     links are not currently supported" notice for it instead of ignoring it.
     App tools bind their UI via tool _meta.ui only — results must stay
     link-free."""
-    async with mcp_session() as session:
+    async with mcp_session(with_trips=True) as session:
         for spec in APP_SPECS:
             result = await session.call_tool(spec.tool_name, _APP_ARGS[spec.tool_name])
             assert not result.is_error, spec.tool_name

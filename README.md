@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 35 tools, 6 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 39 tools, 6 prompts, and interactive charts.
 
 [![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
@@ -129,9 +129,19 @@ Each report tool accepts optional filters: `car_name` everywhere, plus `days`, `
 | `get_charging_curve` | Power and SOC curve for one charging session, downsampled |
 | `get_charging_costs` | Costs grouped by month, location, or car |
 
-### Charts (3)
+### Trips (3)
 
-`show_charging_curve`, `show_battery_degradation`, and `show_drive_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route map draws the track over a low-detail basemap (Esri gray canvas, light or dark to match the client). Set `MAP_TILES=false` to keep it fully offline.
+TeslaMate ends a drive every time the car parks, so a road trip with a WC break and a charging stop is several drives. The trip tools merge a car's consecutive drives while each stop in between stays short: up to `max_stop_minutes` (default 30) without charging, or `max_charging_stop_minutes` (default 120) when a charging session happened during the stop. Overnight stops end a trip.
+
+| Tool | What it returns |
+|---|---|
+| `get_trips` | One row per trip: legs, stops and charging stops, distance, driving vs stopped time, moving speed, battery % at start and end, kWh added on the way; filter by date, car, distance, legs, or a place the trip passed through |
+| `get_trip_details` | One trip's timeline: each drive, and each stop with where and how long, plus kWh and battery % for charging stops |
+| `get_trip_route` | GPS track of a whole trip across its drives, downsampled, with the stop before each leg |
+
+### Charts (4)
+
+`show_charging_curve`, `show_battery_degradation`, `show_drive_route`, and `show_trip_route` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 
@@ -227,7 +237,7 @@ The startup validation rejects a query when a declared parameter is missing from
 uv sync                          # install with dev dependencies
 uv run ruff check src tests      # lint
 uv run ruff format src tests     # format
-uv run pytest                    # 138 tests; Docker-backed tests skip without Docker
+uv run pytest                    # 152 tests; database tests need Docker or TESLAMATE_TEST_DATABASE_URL
 ```
 
 ## License

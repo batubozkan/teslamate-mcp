@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-09-30
+
 ### Added
 - **Sleep and wake analysis** from TeslaMate's `states` table, which no tool
   read before.

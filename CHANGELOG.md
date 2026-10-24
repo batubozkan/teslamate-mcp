@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Fixed
+- On Windows the server could not reach Postgres: asyncio's default Proactor
+  loop is one psycopg's async connection refuses, so every tool call failed
+  and `/health` returned 503. `stdio` and `http` now select the selector event
+  loop first. From upstream (#16 there, by PerryLink).
+
 ## [0.17.0] - 2026-10-24
 
 ### Added

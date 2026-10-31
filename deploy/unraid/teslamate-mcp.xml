@@ -39,7 +39,7 @@
           Description="Bearer token protecting /mcp. Generate with: openssl rand -base64 32 (or `teslamate-mcp gen-token`). Leave empty ONLY for LAN-only unauthenticated use - never when exposed via tunnel."
           Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="CF_ACCESS_TEAM_DOMAIN" Target="CF_ACCESS_TEAM_DOMAIN" Default="" Mode=""
-          Description="Optional. Cloudflare Access team domain (e.g. myteam.cloudflareaccess.com). With CF_ACCESS_AUD, accepts requests authenticated by Cloudflare Access - needed to connect claude.ai directly (without the MCP portal) so MCP Apps charts render."
+          Description="Optional. Cloudflare Access team domain (e.g. myteam.cloudflareaccess.com). With CF_ACCESS_AUD, accepts requests authenticated by Cloudflare Access - lets claude.ai connect directly, without the MCP portal."
           Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="CF_ACCESS_AUD" Target="CF_ACCESS_AUD" Default="" Mode=""
           Description="Optional. Application Audience (AUD) tag of the Cloudflare Access application protecting the direct hostname. Set together with CF_ACCESS_TEAM_DOMAIN."

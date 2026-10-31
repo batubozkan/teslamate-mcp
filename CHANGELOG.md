@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-01
+
 ### Added
 - **`show_trip_replay`**: a trip played back as an animation in the
   conversation, no video rendered. The car drives the GPS track on a tilted

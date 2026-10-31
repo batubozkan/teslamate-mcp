@@ -194,6 +194,32 @@ APP_SPECS: tuple[AppSpec, ...] = (
         ),
     ),
     AppSpec(
+        tool_name="show_trip_replay",
+        query_name="get_trip_route",
+        base_uri="ui://teslamate/trip-replay.html",
+        html_file="trip_replay.html",
+        resource_name="trip_replay_map",
+        resource_title="Trip replay",
+        resource_description=(
+            "Animated replay of a multi-drive trip: the car drives the route on a tilted, "
+            "following map with live speed, battery, and stop cards."
+        ),
+        tool_description=(
+            "Play a trip back as an animation, displayed directly in the "
+            "conversation: the car drives the GPS track on a tilted map that "
+            "follows it, the route draws in behind it, a heads-up display counts "
+            "clock time, speed, battery, distance, and elevation, every stop "
+            "comes up as a card (charging stops with their battery gain), and a "
+            "summary card closes the trip. Play/pause, a scrubber that also "
+            "shows battery level and stops, playback speed, and follow or "
+            "overview camera. Returns the same rows as get_trip_route, so it also "
+            "works as a plain data tool. Prefer this over show_trip_route when "
+            "the user wants to replay, animate, or relive a trip; pass "
+            "max_points=1000 or more for a smoother track on a long trip. Find "
+            "trip ids with get_trips."
+        ),
+    ),
+    AppSpec(
         tool_name="show_charging_curve_comparison",
         query_name="get_charging_curve_comparison",
         base_uri="ui://teslamate/charging-curve-comparison.html",

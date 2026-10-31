@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trip replay</title>
+<style>/*__MAP_GL_CSS__*/</style>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --route: #3e6ae1;
+    --map-bg: #fafaf8;
+    --icon-invert: 0;
+    --marker-stop: #6f6e69;
+    --marker-charge: #1fae5b;
+    --border: rgba(11,11,11,0.10);
+    --glass: rgba(252,252,251,0.86);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --route: #5b84f0;
+      --map-bg: #0e0e0e;
+      --icon-invert: 1;
+      --marker-stop: #a9a89f;
+      --marker-charge: #2fd073;
+      --border: rgba(255,255,255,0.10);
+      --glass: rgba(26,26,25,0.82);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --route: #5b84f0;
+    --map-bg: #0e0e0e;
+    --icon-invert: 1;
+    --marker-stop: #a9a89f;
+    --marker-charge: #2fd073;
+    --border: rgba(255,255,255,0.10);
+    --glass: rgba(26,26,25,0.82);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 14px 14px 10px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .stage { position: relative; margin-top: 10px; }
+  .stage .tm-map { height: 420px; }
+  #chart { display: block; width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--map-bg); }
+  .route-full { fill: none; stroke: var(--route); stroke-width: 3; opacity: 0.3; stroke-linejoin: round; stroke-linecap: round; }
+  .route-done { fill: none; stroke: var(--route); stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
+  .route-glow { fill: none; stroke: var(--route); stroke-width: 10; opacity: 0.25; stroke-linejoin: round; stroke-linecap: round; }
+  .attribution { font-size: 9px; fill: var(--text-secondary); paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; }
+
+  /* Heads-up display over the map: clock, speed, battery, distance. */
+  .hud {
+    position: absolute; top: 10px; left: 10px; z-index: 2; pointer-events: none;
+    display: grid; grid-template-columns: auto auto; gap: 8px 18px;
+    background: var(--glass); backdrop-filter: blur(6px);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    font-variant-numeric: tabular-nums; min-width: 200px;
+  }
+  .hud .v { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.1; }
+  .hud .v small { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+  .hud .l { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  .hud .clock { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--text-secondary); }
+  .hud .clock b { color: var(--text-primary); font-weight: 600; }
+  .bat { display: flex; align-items: center; gap: 6px; }
+  .bat .bar { width: 34px; height: 12px; border: 1.5px solid var(--text-secondary); border-radius: 3px; padding: 1px; position: relative; }
+  .bat .bar::after { content: ""; position: absolute; right: -4px; top: 3px; width: 2px; height: 4px; background: var(--text-secondary); border-radius: 0 1px 1px 0; }
+  .bat .fill { display: block; height: 100%; border-radius: 1px; background: var(--marker-charge); transition: background 0.3s; }
+  .bat.low .fill { background: #e5484d; }
+  .bat.charging .fill { animation: pulse 0.9s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+
+  /* The card that comes up while the car is stopped, and the one at the end. */
+  .card {
+    position: absolute; right: 54px; top: 10px; z-index: 3; pointer-events: none;
+    transform: translateY(-12px); opacity: 0; transition: opacity 0.35s, transform 0.35s;
+    background: var(--glass); backdrop-filter: blur(6px);
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.16); font-size: 13px; white-space: nowrap;
+  }
+  .card.show { opacity: 1; transform: none; }
+  .card .k { font-weight: 650; }
+  .card .k.charge { color: var(--marker-charge); }
+  .card .d { color: var(--text-secondary); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .summary {
+    position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--surface-1) 35%, transparent);
+    opacity: 0; pointer-events: none; transition: opacity 0.5s; border-radius: 8px;
+  }
+  .summary.show { opacity: 1; pointer-events: auto; }
+  .summary .box {
+    background: var(--glass); backdrop-filter: blur(8px); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 22px; box-shadow: 0 8px 28px rgba(0,0,0,0.2);
+    text-align: center; max-width: 92%;
+    transform: scale(0.96); transition: transform 0.5s;
+  }
+  .summary.show .box { transform: scale(1); }
+  .summary h2 { font-size: 15px; font-weight: 650; }
+  .summary .grid { display: grid; grid-template-columns: repeat(3, auto); gap: 12px 22px; margin: 14px 0 16px; text-align: left; }
+  .summary .grid .v { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .summary .grid .l { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  .btn {
+    font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px;
+    background: var(--surface-1); color: var(--text-primary);
+  }
+  .btn.primary { background: var(--route); border-color: var(--route); color: #fff; }
+  .btn:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+
+  /* The car. */
+  .car {
+    width: 32px; height: 32px; pointer-events: none;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
+  }
+  .car svg { display: block; width: 100%; height: 100%; }
+  .tm-dot.stop, .tm-dot.charge { opacity: 0.35; transition: opacity 0.4s, transform 0.4s; }
+  .tm-dot.reached { opacity: 1; }
+  .tm-dot.end { opacity: 0; transition: opacity 0.4s; }
+  .tm-dot.end.reached { opacity: 1; }
+
+  /* Player controls under the map. */
+  .player { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .play {
+    flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--route); color: #fff; display: flex; align-items: center; justify-content: center;
+  }
+  .play:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+  .play svg { width: 16px; height: 16px; }
+  #timeline { flex: 1; min-width: 0; display: block; height: 44px; cursor: pointer; touch-action: none; }
+  #timeline:focus-visible { outline: 1.5px solid var(--route); outline-offset: 2px; border-radius: 4px; }
+  .tl-track { fill: var(--grid); }
+  .tl-done { fill: var(--route); }
+  .tl-soc { fill: none; stroke: var(--text-muted); stroke-width: 1.2; opacity: 0.8; }
+  .tl-stop { fill: var(--marker-stop); }
+  .tl-charge { fill: var(--marker-charge); }
+  .tl-head { fill: var(--surface-1); stroke: var(--route); stroke-width: 2.5; }
+  .tl-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .options { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+  .seg[hidden] { display: none; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 11px; font-weight: 600; padding: 4px 9px; border: 0; cursor: pointer;
+    background: var(--surface-1); color: var(--text-secondary);
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--route); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--route); outline-offset: -2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 5px; }
+  .legend .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  @media (max-width: 480px) {
+    .stage .tm-map { height: 360px; }
+    .hud { gap: 6px 12px; padding: 8px 10px; }
+    .hud .v { font-size: 16px; }
+    .card { right: auto; left: 10px; top: auto; bottom: 34px; }
+    .summary .grid { grid-template-columns: repeat(2, auto); }
+  }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Trip replay</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div id="viewer" hidden>
+    <div class="stage" id="stage">
+      <div class="tm-map" id="map" hidden></div>
+      <svg id="chart" role="img" aria-label="Trip route with the car's position" style="display:none"></svg>
+      <div class="hud" id="hud" aria-live="off">
+        <div class="clock"><b id="hudClock">–</b><span id="hudLeg"></span></div>
+        <div><div class="v" id="hudSpeed">–</div><div class="l">Speed</div></div>
+        <div><div class="v bat" id="hudBat"><span class="bar"><span class="fill" id="hudBatFill"></span></span><span id="hudBatText">–</span></div><div class="l">Battery</div></div>
+        <div><div class="v" id="hudDist">–</div><div class="l">Driven</div></div>
+        <div><div class="v" id="hudElev">–</div><div class="l">Elevation</div></div>
+      </div>
+      <div class="card" id="card" role="status"></div>
+      <div class="summary" id="summary">
+        <div class="box">
+          <h2 id="summaryTitle">Trip complete</h2>
+          <div class="grid" id="summaryGrid"></div>
+          <button type="button" class="btn primary" id="replayBtn">Replay</button>
+        </div>
+      </div>
+    </div>
+    <div class="player">
+      <button type="button" class="play" id="playBtn" aria-label="Play"></button>
+      <svg id="timeline" tabindex="0" role="slider" aria-label="Replay position" aria-valuemin="0" aria-valuemax="100"></svg>
+    </div>
+    <div class="options">
+      <div class="legend">
+        <div class="item"><span class="dot" style="background:var(--marker-stop)"></span>Stop</div>
+        <div class="item"><span class="dot" style="background:var(--marker-charge)"></span>Charging stop</div>
+        <div class="item"><span class="dot" style="background:var(--text-muted);height:2px;border-radius:0;width:12px"></span>Battery %</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="seg" id="cameraSeg" role="group" aria-label="Camera">
+          <button type="button" data-mode="follow">Follow</button>
+          <button type="button" data-mode="overview">Overview</button>
+        </div>
+        <div class="seg" id="speedSeg" role="group" aria-label="Playback speed">
+          <button type="button" data-speed="0.5">½×</button>
+          <button type="button" data-speed="1">1×</button>
+          <button type="button" data-speed="2">2×</button>
+          <button type="button" data-speed="4">4×</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="state" id="state">Waiting for the route data…</div>
+</div>
+<script>/*__MAPLIBRE_JS__*/</script>
+<script>/*__MAP_GL_JS__*/</script>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+let hostTimeZone = null;
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.theme || p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    pause();
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  if (msg.method === "ping" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  // Answer any other host request so it fails fast instead of timing out.
+  if (msg.method && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+  }
+});
+
+// Params per McpUiInitializeRequest (ext-apps 2026-01-26): appInfo,
+// appCapabilities and protocolVersion are all required. Hosts validate them
+// and send tool-input/tool-result only after `initialized`, so a rejected
+// handshake leaves the view empty.
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  appInfo: { name: "teslamate-trip-replay", version: "1.0.0" },
+  appCapabilities: {},
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  if (hc.timeZone) hostTimeZone = hc.timeZone;
+  notify("ui/notifications/initialized");
+  render();
+}).catch((err) => {
+  console.error("[teslamate] ui/initialize rejected by host:", err);
+  showState("The chart could not connect to the host.");
+});
+
+/* ---------- data handling ---------- */
+let rows = [];
+let tripId = null;
+
+function onToolInput(args) {
+  if (args && args.trip_id != null) {
+    tripId = args.trip_id;
+    setText("title", "Trip replay · trip #" + tripId);
+  }
+}
+
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the route. " + text);
+    return;
+  }
+  rows = extractRows(result);
+  pause();
+  if (scene) { scene.remove(); scene = null; } // new rows get a new map
+  buildModel();
+  if (points.length < 2) {
+    showState("Not enough timed GPS positions recorded for this trip to replay it.");
+    return;
+  }
+  buildStory();
+  document.getElementById("state").hidden = true;
+  document.getElementById("viewer").hidden = false;
+  renderSubtitle();
+  renderSummary();
+  storyPos = 0;
+  finished = false;
+  lastHud = "";
+  cardFor = null;
+  autoplayPending = !reducedMotion();
+  if (reducedMotion()) cameraMode = "overview";
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  document.getElementById("viewer").hidden = true;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+function reducedMotion() {
+  return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+
+/* ---------- model ---------- */
+let points = []; // {t (ms), lat, lon, soc, odo, elev, leg, stopBefore, stopMin}
+
+function parseUtc(s) {
+  if (typeof s !== "string") return null;
+  const iso = /(Z|[+-]\d\d:?\d\d)$/.test(s) ? s : s + "Z"; // TeslaMate stores naive UTC
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
+function buildModel() {
+  points = rows.map((r) => ({
+    t: parseUtc(r.ts),
+    lat: r.latitude,
+    lon: r.longitude,
+    soc: r.battery_level,
+    speedMax: r.speed_max_kmh,
+    odo: r.odometer_km,
+    elev: r.elevation_m,
+    leg: r.leg,
+    stopBefore: r.stop_before,
+    stopMin: r.stop_before_min,
+  })).filter((p) => p.lat != null && p.lon != null && p.t != null);
+  // Average speed into each point, from the odometer where it is known.
+  points.forEach((p, i) => {
+    const q = points[i - 1];
+    p.speed = null;
+    if (q && q.leg === p.leg && p.odo != null && q.odo != null && p.t > q.t) {
+      p.speed = Math.max(0, (p.odo - q.odo) / ((p.t - q.t) / 3600000));
+    }
+  });
+  points.forEach((p, i) => {
+    if (p.speed == null && i + 1 < points.length && points[i + 1].leg === p.leg) p.speed = points[i + 1].speed;
+  });
+}
+
+/* ---------- story: the trip on a playback clock ----------
+   A 4-hour trip and a 40-minute one both play in well under a minute. Each
+   stretch between two track points gets playback time by a blend of the time
+   it took and the ground it covered, so a crawl through city traffic does not
+   eat the replay and a fast motorway does not flash past; the clock in the
+   HUD still shows the real time. Every stop gets a short fixed beat. All
+   positions are in playback seconds at 1×. */
+const STOP_BEAT = 1.6, CHARGE_BEAT = 2.8, LEAD_IN = 0.4;
+let segments = []; // {kind: "drive"|"stop", s0, s1, i0, i1, t0, t1, charging, minutes}
+let storyLength = 0;
+let stopMarks = []; // the stop segments, in order
+let pointStory = []; // playback second at each track point (drives only)
+
+function buildStory() {
+  segments = [];
+  const legsStart = [0];
+  for (let i = 1; i < points.length; i++) if (points[i].leg !== points[i - 1].leg) legsStart.push(i);
+  const legs = legsStart.map((i0, k) => [i0, (legsStart[k + 1] || points.length) - 1]);
+  // Time and ground of every driven stretch (stretches across a stop excluded).
+  const dt = [], dd = [];
+  let totalT = 0, totalD = 0;
+  for (let i = 1; i < points.length; i++) {
+    const same = points[i].leg === points[i - 1].leg;
+    dt[i] = same ? Math.max(0, points[i].t - points[i - 1].t) : 0;
+    dd[i] = same ? distM(points[i - 1], points[i]) : 0;
+    totalT += dt[i];
+    totalD += dd[i];
+  }
+  // About 10 s for a short hop, 4 s more per hour driven, at most 36 s.
+  const driveSeconds = Math.max(10, Math.min(36, 10 + 4 * (totalT / 3600000)));
+  const share = (i) => {
+    const byT = totalT > 0 ? dt[i] / totalT : 0, byD = totalD > 0 ? dd[i] / totalD : 0;
+    if (totalT > 0 && totalD > 0) return 0.5 * byT + 0.5 * byD;
+    if (totalT > 0 || totalD > 0) return byT + byD;
+    return 1 / Math.max(1, points.length - legs.length); // nothing to go on: even
+  };
+  let s = LEAD_IN;
+  pointStory = [];
+  legs.forEach(([i0, i1], k) => {
+    if (k > 0) {
+      const prev = legs[k - 1][1], p = points[i0];
+      const charging = p.stopBefore === "charging_stop";
+      const beat = charging ? CHARGE_BEAT : STOP_BEAT;
+      segments.push({
+        kind: "stop", s0: s, s1: s + beat, i0: prev, i1: i0, t0: points[prev].t, t1: p.t,
+        charging,
+        minutes: p.stopMin != null ? p.stopMin : (p.t - points[prev].t) / 60000,
+      });
+      s += beat;
+    }
+    const s0 = s;
+    pointStory[i0] = s;
+    for (let i = i0 + 1; i <= i1; i++) { s += share(i) * driveSeconds; pointStory[i] = s; }
+    segments.push({ kind: "drive", s0, s1: s, i0, i1, t0: points[i0].t, t1: points[i1].t });
+  });
+  storyLength = s;
+  stopMarks = segments.filter((g) => g.kind === "stop");
+}
+
+function lerp(a, b, f) { return a == null || b == null ? (f < 0.5 ? a : b) : a + (b - a) * f; }
+const easeInOut = (f) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+
+// Where the trip stands at playback second s.
+function stateAt(s) {
+  s = Math.max(0, Math.min(storyLength, s));
+  let seg = segments[0];
+  for (const g of segments) { if (s >= g.s0) seg = g; else break; }
+  if (s < seg.s0) s = seg.s0; // the lead-in holds the start
+  const f = seg.s1 > seg.s0 ? Math.min(1, (s - seg.s0) / (seg.s1 - seg.s0)) : 1;
+  if (seg.kind === "stop") {
+    const a = points[seg.i0], b = points[seg.i1];
+    // Battery fills through a charging stop; the car eases over any gap
+    // between where the last drive ended and the next one began.
+    const fe = easeInOut(f);
+    return {
+      seg, f, idx: seg.i0, lat: lerp(a.lat, b.lat, fe), lon: lerp(a.lon, b.lon, fe),
+      t: lerp(a.t, b.t, f), soc: a.soc != null && b.soc != null ? Math.round(lerp(a.soc, b.soc, fe)) : a.soc,
+      odo: a.odo, elev: a.elev, speed: 0,
+    };
+  }
+  let lo = seg.i0, hi = seg.i1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pointStory[mid] <= s) lo = mid; else hi = mid; }
+  const a = points[lo], b = points[hi];
+  const span = pointStory[hi] - pointStory[lo];
+  const g = span > 0 ? Math.max(0, Math.min(1, (s - pointStory[lo]) / span)) : 1;
+  return {
+    seg, f, idx: lo, lat: lerp(a.lat, b.lat, g), lon: lerp(a.lon, b.lon, g), t: lerp(a.t, b.t, g),
+    soc: g < 0.5 ? a.soc : b.soc, odo: lerp(a.odo, b.odo, g), elev: lerp(a.elev, b.elev, g),
+    speed: b.speed != null ? b.speed : a.speedMax,
+  };
+}
+
+/* ---------- formatting ---------- */
+const timeFmt = () => new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit", minute: "2-digit", ...(hostTimeZone ? { timeZone: hostTimeZone } : {}),
+});
+const dateFmt = () => new Intl.DateTimeFormat(undefined, {
+  weekday: "short", day: "numeric", month: "short", year: "numeric",
+  ...(hostTimeZone ? { timeZone: hostTimeZone } : {}),
+});
+function fmtTime(ms) { return ms != null ? timeFmt().format(new Date(ms)) : "–"; }
+function fmtDur(ms) {
+  const m = Math.round(ms / 60000);
+  return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min";
+}
+function tripDistance() {
+  const odos = points.map((p) => p.odo).filter((v) => v != null);
+  return odos.length > 1 ? Math.max(...odos) - Math.min(...odos) : null;
+}
+
+function renderSubtitle() {
+  const first = points[0], last = points[points.length - 1];
+  const legs = new Set(points.map((p) => p.leg)).size;
+  const dist = tripDistance();
+  setText("subtitle", dateFmt().format(new Date(first.t)) + " · " + fmtTime(first.t) + " – "
+    + fmtTime(last.t) + (dist != null ? " · " + dist.toFixed(0) + " km" : "")
+    + " · " + legs + (legs === 1 ? " drive" : " drives"));
+}
+
+function renderSummary() {
+  const first = points[0], last = points[points.length - 1];
+  const dist = tripDistance();
+  const driveMs = segments.filter((g) => g.kind === "drive").reduce((a, g) => a + (g.t1 - g.t0), 0);
+  const charging = stopMarks.filter((g) => g.charging).length;
+  const speeds = points.map((p) => p.speedMax).filter((v) => v != null);
+  const elevs = points.map((p) => p.elev).filter((v) => v != null);
+  const stats = [];
+  if (dist != null) stats.push([dist.toFixed(1) + " km", "Distance"]);
+  stats.push([fmtDur(last.t - first.t), "Total time"]);
+  stats.push([fmtDur(driveMs), "Driving"]);
+  if (dist != null && driveMs > 0) stats.push([Math.round(dist / (driveMs / 3600000)) + " km/h", "Avg speed"]);
+  stats.push([stopMarks.length + (charging ? " (" + charging + " ⚡)" : ""), "Stops"]);
+  if (first.soc != null && last.soc != null) stats.push([first.soc + "% → " + last.soc + "%", "Battery"]);
+  if (speeds.length) stats.push([Math.max(...speeds) + " km/h", "Top speed"]);
+  if (elevs.length > 1) stats.push([Math.max(...elevs) + " m", "Highest point"]);
+  document.getElementById("summaryGrid").replaceChildren(...stats.slice(0, 9).map(([v, l]) => {
+    const d = document.createElement("div");
+    const dv = document.createElement("div"); dv.className = "v"; dv.textContent = v;
+    const dl = document.createElement("div"); dl.className = "l"; dl.textContent = l;
+    d.append(dv, dl);
+    return d;
+  }));
+  setText("summaryTitle", "Trip complete · " + fmtTime(first.t) + " – " + fmtTime(last.t));
+}
+
+/* ---------- playback ---------- */
+let storyPos = 0, playing = false, speed = 1, finished = false, autoplayPending = false;
+let cameraMode = "follow"; // follow | overview | free (the user moved the map)
+let raf = 0, lastFrame = 0;
+
+function play() {
+  if (!points.length) return;
+  if (storyPos >= storyLength) restart();
+  playing = true;
+  finished = false;
+  showSummary(false);
+  if (cameraMode === "follow" && scene) scene.startTransition(1.4);
+  updateButtons();
+  lastFrame = 0;
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(tick);
+}
+function pause() {
+  playing = false;
+  cancelAnimationFrame(raf);
+  updateButtons();
+}
+function restart() {
+  storyPos = 0;
+  finished = false;
+  if (scene) scene.resetReached();
+}
+function seek(s) {
+  storyPos = Math.max(0, Math.min(storyLength, s));
+  finished = false;
+  showSummary(false);
+  if (scene && cameraMode === "follow") scene.startTransition(0.5);
+  frame(0);
+  if (!playing && scene && scene.animating()) { lastFrame = 0; raf = requestAnimationFrame(tick); }
+}
+
+function tick(now) {
+  const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
+  lastFrame = now;
+  if (playing) {
+    storyPos += dt * speed;
+    if (storyPos >= storyLength) {
+      storyPos = storyLength;
+      playing = false;
+      finished = true;
+      updateButtons();
+      frame(dt);
+      if (scene) scene.finish();
+      setTimeout(() => { if (finished) showSummary(true); }, 900);
+      return;
+    }
+  }
+  frame(dt);
+  if (playing || (scene && scene.animating())) raf = requestAnimationFrame(tick);
+}
+
+// Draw the current moment: map, HUD, card, timeline.
+function frame(dt) {
+  if (!points.length) return;
+  const st = stateAt(storyPos);
+  if (scene) scene.update(st, dt);
+  renderHud(st);
+  renderCard(st);
+  updateTimelineHead();
+}
+
+let lastHud = "";
+function renderHud(st) {
+  const legs = new Set(points.map((p) => p.leg)).size;
+  const leg = st.seg.kind === "stop" ? null : points[st.seg.i0].leg;
+  const dist = st.odo != null && points[0].odo != null ? st.odo - points[0].odo : null;
+  const key = [Math.floor(st.t / 60000), leg, Math.round(st.speed || 0), st.soc,
+    dist != null ? dist.toFixed(1) : "", st.elev != null ? Math.round(st.elev) : ""].join("|");
+  if (key === lastHud) return;
+  lastHud = key;
+  setText("hudClock", fmtTime(st.t));
+  setText("hudLeg", leg != null ? "Drive " + leg + " of " + legs
+    : (st.seg.charging ? "Charging" : "Stopped"));
+  setHtmlNumber("hudSpeed", st.speed != null ? Math.round(st.speed) : null, "km/h");
+  setHtmlNumber("hudDist", dist != null ? dist.toFixed(1) : null, "km");
+  setHtmlNumber("hudElev", st.elev != null ? Math.round(st.elev) : null, "m");
+  const bat = document.getElementById("hudBat");
+  setText("hudBatText", st.soc != null ? st.soc + "%" : "–");
+  document.getElementById("hudBatFill").style.width = Math.max(0, Math.min(100, st.soc || 0)) + "%";
+  bat.classList.toggle("low", st.soc != null && st.soc < 20);
+  bat.classList.toggle("charging", st.seg.kind === "stop" && st.seg.charging);
+}
+function setHtmlNumber(id, value, unit) {
+  const el = document.getElementById(id);
+  if (value == null) { el.textContent = "–"; return; }
+  const small = document.createElement("small");
+  small.textContent = unit;
+  el.replaceChildren(String(value), small);
+}
+
+let cardFor = null;
+function renderCard(st) {
+  const card = document.getElementById("card");
+  const seg = st.seg.kind === "stop" ? st.seg : null;
+  if (seg === cardFor) return;
+  cardFor = seg;
+  if (!seg) { card.classList.remove("show"); return; }
+  const a = points[seg.i0], b = points[seg.i1];
+  const k = document.createElement("div");
+  k.className = "k" + (seg.charging ? " charge" : "");
+  k.textContent = (seg.charging ? "⚡ Charging stop" : "Stop") + " · " + fmtDur(seg.minutes * 60000);
+  const d = document.createElement("div");
+  d.className = "d";
+  let text = fmtTime(seg.t0) + " – " + fmtTime(seg.t1);
+  if (seg.charging && a.soc != null && b.soc != null) {
+    text += " · " + a.soc + "% → " + b.soc + "%" + (b.soc > a.soc ? " (+" + (b.soc - a.soc) + ")" : "");
+  }
+  d.textContent = text;
+  card.replaceChildren(k, d);
+  card.classList.add("show");
+}
+
+function showSummary(on) { document.getElementById("summary").classList.toggle("show", on); }
+
+const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1.2"/><rect x="14" y="4" width="5" height="16" rx="1.2"/></svg>';
+const REPLAY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+function updateButtons() {
+  const btn = document.getElementById("playBtn");
+  btn.innerHTML = playing ? PAUSE_ICON : (finished ? REPLAY_ICON : PLAY_ICON);
+  btn.setAttribute("aria-label", playing ? "Pause" : (finished ? "Replay" : "Play"));
+  for (const b of document.querySelectorAll("#speedSeg button")) {
+    b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed));
+  }
+  for (const b of document.querySelectorAll("#cameraSeg button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.mode === cameraMode));
+  }
+}
+function setCameraMode(mode) {
+  cameraMode = mode;
+  updateButtons();
+  if (!scene) return;
+  if (mode === "overview") scene.overview();
+  if (mode === "follow") {
+    scene.startTransition(1.2);
+    if (!playing) { lastFrame = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); }
+  }
+}
+
+document.getElementById("playBtn").addEventListener("click", () => (playing ? pause() : play()));
+document.getElementById("replayBtn").addEventListener("click", () => { restart(); play(); });
+document.getElementById("speedSeg").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (b) { speed = Number(b.dataset.speed); updateButtons(); }
+});
+document.getElementById("cameraSeg").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (b) setCameraMode(b.dataset.mode);
+});
+document.getElementById("root").addEventListener("keydown", (ev) => {
+  if (!points.length || ev.target.closest("button")) return;
+  if (ev.key === " " || ev.key === "k") { ev.preventDefault(); playing ? pause() : play(); }
+  else if (ev.key === "ArrowRight") { ev.preventDefault(); seek(storyPos + storyLength * 0.05); }
+  else if (ev.key === "ArrowLeft") { ev.preventDefault(); seek(storyPos - storyLength * 0.05); }
+  else if (ev.key === "Home") { ev.preventDefault(); seek(0); }
+  else if (ev.key === "End") { ev.preventDefault(); seek(storyLength); }
+});
+
+/* ---------- timeline: a scrubber that also shows battery and stops ---------- */
+const TL = { h: 44, barY: 30, barH: 4, socTop: 4, socBottom: 24, padX: 8 };
+let tlWidth = 0;
+
+function tlX(s) { return TL.padX + (s / storyLength) * (tlWidth - 2 * TL.padX); }
+
+function renderTimeline() {
+  const svg = document.getElementById("timeline");
+  tlWidth = Math.max(160, svg.clientWidth || 160);
+  svg.setAttribute("viewBox", "0 0 " + tlWidth + " " + TL.h);
+  svg.replaceChildren();
+  const NS = "http://www.w3.org/2000/svg";
+  const mk = (name, attrs) => {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  // Battery level across the replay, as a thin line above the bar.
+  const samples = 160, pts = [];
+  for (let k = 0; k <= samples; k++) {
+    const s = (k / samples) * storyLength, soc = stateAt(s).soc;
+    if (soc != null) {
+      pts.push(tlX(s).toFixed(1) + " " + (TL.socBottom - (soc / 100) * (TL.socBottom - TL.socTop)).toFixed(1));
+    }
+  }
+  if (pts.length > 1) svg.append(mk("path", { d: "M" + pts.join(" L"), class: "tl-soc" }));
+  svg.append(mk("rect", { x: TL.padX, y: TL.barY, width: tlWidth - 2 * TL.padX, height: TL.barH, rx: 2, class: "tl-track" }));
+  svg.append(mk("rect", { id: "tlDone", x: TL.padX, y: TL.barY, width: 0, height: TL.barH, rx: 2, class: "tl-done" }));
+  for (const g of stopMarks) {
+    const x0 = tlX(g.s0), x1 = tlX(g.s1);
+    const r = mk("rect", {
+      x: x0, y: TL.barY - 2, width: Math.max(3, x1 - x0), height: TL.barH + 4, rx: 2,
+      class: g.charging ? "tl-charge" : "tl-stop",
+    });
+    const title = mk("title", {});
+    title.textContent = (g.charging ? "Charging stop" : "Stop") + " · " + fmtDur(g.minutes * 60000)
+      + " · " + fmtTime(g.t0);
+    r.append(title);
+    svg.append(r);
+  }
+  const start = mk("text", { x: TL.padX, y: TL.h - 1, class: "tl-label" });
+  start.textContent = fmtTime(points[0].t);
+  const end = mk("text", { x: tlWidth - TL.padX, y: TL.h - 1, "text-anchor": "end", class: "tl-label" });
+  end.textContent = fmtTime(points[points.length - 1].t);
+  svg.append(start, end);
+  svg.append(mk("circle", { id: "tlHead", cx: TL.padX, cy: TL.barY + TL.barH / 2, r: 6, class: "tl-head" }));
+  updateTimelineHead();
+}
+
+function updateTimelineHead() {
+  const head = document.getElementById("tlHead");
+  if (!head || !storyLength) return;
+  const x = tlX(storyPos);
+  head.setAttribute("cx", x.toFixed(1));
+  document.getElementById("tlDone").setAttribute("width", Math.max(0, x - TL.padX).toFixed(1));
+  const svg = document.getElementById("timeline");
+  svg.setAttribute("aria-valuenow", String(Math.round((storyPos / storyLength) * 100)));
+  svg.setAttribute("aria-valuetext", fmtTime(stateAt(storyPos).t));
+}
+
+(function bindTimeline() {
+  const svg = document.getElementById("timeline");
+  let dragging = false, wasPlaying = false;
+  const at = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const x = ((ev.clientX - rect.left) / rect.width) * tlWidth;
+    return ((x - TL.padX) / (tlWidth - 2 * TL.padX)) * storyLength;
+  };
+  svg.addEventListener("pointerdown", (ev) => {
+    if (!storyLength) return;
+    dragging = true;
+    wasPlaying = playing;
+    pause();
+    svg.setPointerCapture(ev.pointerId);
+    seek(at(ev));
+  });
+  svg.addEventListener("pointermove", (ev) => { if (dragging) seek(at(ev)); });
+  const end = () => { if (!dragging) return; dragging = false; if (wasPlaying) play(); };
+  svg.addEventListener("pointerup", end);
+  svg.addEventListener("pointercancel", end);
+})();
+
+/* ---------- the map ---------- */
+// Filled in by the server: the basemap host when MAP_TILES is on, else "".
+const TILE_HOST_SETTING = "__MAP_TILE_HOST__";
+// Left unreplaced (starts with "__") means the view was loaded outside the server.
+const TILE_HOST = TILE_HOST_SETTING.startsWith("__") ? "" : TILE_HOST_SETTING;
+// The interactive map (MapLibre over CARTO's vector basemap) is inlined by the
+// server when MAP_TILES is on. Where it cannot run, an SVG map plays instead.
+let glMode = typeof TeslaMateMap === "undefined" ? "off" : "pending";
+let scene = null;
+if (glMode === "pending") {
+  TeslaMateMap.available().then((ok) => { glMode = ok ? "on" : "off"; render(); });
+}
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  if (t) return t === "dark";
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function routeColor() {
+  return getComputedStyle(document.getElementById("root")).getPropertyValue("--route").trim() || "#3e6ae1";
+}
+
+function render() {
+  if (!points.length || glMode === "pending") { reportSize(); return; }
+  if (scene && scene.kind === "gl") scene.setDark(isDark());
+  if (!scene && glMode === "on") { scene = glScene(); if (!scene) glMode = "off"; }
+  if (!scene && glMode === "off") scene = svgScene();
+  if (scene && scene.kind === "svg") scene.layout();
+  renderTimeline();
+  updateButtons();
+  frame(0);
+  reportSize();
+  if (autoplayPending && scene) {
+    autoplayPending = false;
+    scene.whenReady(() => setTimeout(() => { if (!playing && storyPos === 0) play(); }, 500));
+  }
+}
+
+function bearingBetween(a, b) {
+  const toRad = Math.PI / 180;
+  const y = Math.sin((b.lon - a.lon) * toRad) * Math.cos(b.lat * toRad);
+  const x = Math.cos(a.lat * toRad) * Math.sin(b.lat * toRad)
+    - Math.sin(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.cos((b.lon - a.lon) * toRad);
+  return (Math.atan2(y, x) * 180) / Math.PI;
+}
+function distM(a, b) {
+  const toRad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * toRad, dLon = (b.lon - a.lon) * toRad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+function angleDiff(a, b) { return ((b - a + 540) % 360) - 180; }
+
+// The track up to the car: every point passed, then the car itself.
+function progressCoords(st) {
+  const out = [];
+  for (let i = 0; i <= st.idx; i++) out.push([points[i].lon, points[i].lat]);
+  out.push([st.lon, st.lat]);
+  return out;
+}
+
+const CAR_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="var(--route)" opacity="0.22"/>'
+  + '<path d="M16 4.5 L24.5 26 L16 21.5 L7.5 26 Z" fill="var(--route)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
+
+/* The MapLibre scene: a camera that rides behind the car, tilted, turning with
+   the road and zooming out as the replay speeds up, so the car keeps moving
+   at a readable pace on screen. */
+function glScene() {
+  const box = document.getElementById("map");
+  box.hidden = false;
+  document.getElementById("chart").style.display = "none";
+  const track = points.map((p) => [p.lon, p.lat]);
+  const bounds = TeslaMateMap.bounds(track);
+  const gl = TeslaMateMap.create(box, {
+    dark: isDark(), bounds, padding: 60, maxZoom: 15, fitLabel: "Fit the trip",
+    onFail: () => { scene = null; glMode = "off"; render(); },
+  });
+  if (!gl) { box.hidden = true; return null; }
+  const map = gl.map;
+  const empty = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [track[0], track[0]] } };
+  let progressData = empty;
+  const drawLayers = () => {
+    if (map.getSource("replay-full")) return;
+    const color = routeColor();
+    map.addSource("replay-full", {
+      type: "geojson",
+      data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: track } },
+    });
+    map.addSource("replay-done", { type: "geojson", data: progressData });
+    const layout = { "line-join": "round", "line-cap": "round" };
+    map.addLayer({ id: "replay-full", type: "line", source: "replay-full", layout,
+      paint: { "line-color": color, "line-width": 3, "line-opacity": 0.3 } });
+    map.addLayer({ id: "replay-glow", type: "line", source: "replay-done", layout,
+      paint: { "line-color": color, "line-width": 12, "line-blur": 8, "line-opacity": 0.45 } });
+    map.addLayer({ id: "replay-done", type: "line", source: "replay-done", layout,
+      paint: { "line-color": color, "line-width": 4.5 } });
+  };
+  map.on("style.load", drawLayers);
+
+  const stopMarkers = stopMarks.map((g) => {
+    const p = points[g.i1];
+    return gl.marker([p.lon, p.lat], g.charging ? "charge" : "stop",
+      (g.charging ? "Charging stop" : "Stop") + ", " + fmtDur(g.minutes * 60000));
+  });
+  gl.marker(track[0], "start", "Start");
+  const endMarker = gl.marker(track[track.length - 1], "end", "End");
+  const carEl = document.createElement("div");
+  carEl.className = "car";
+  carEl.innerHTML = CAR_SVG;
+  // Upright to the viewer: laid flat on a tilted map it would shrink to a sliver.
+  const car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" })
+    .setLngLat(track[0]).addTo(map);
+
+  // Any camera move that is not ours hands the camera to the user.
+  map.on("movestart", (ev) => {
+    if (ev.replay || !ev.originalEvent) return;
+    if (cameraMode !== "free") { cameraMode = "free"; updateButtons(); }
+  });
+  // The zoom and fit buttons move the map without a pointer event of their own.
+  box.querySelector(".tm-ctrl").addEventListener("click", () => {
+    if (cameraMode !== "free") { cameraMode = "free"; updateButtons(); }
+  }, true);
+
+  let ready = false;
+  const readyQueue = [];
+  map.once("idle", () => { ready = true; readyQueue.splice(0).forEach((fn) => fn()); });
+
+  let carHeading = 0, cam = null, trans = null;
+  const PITCH = 58;
+
+  // The heading a little way down the road, so turns are anticipated and a
+  // jittery GPS fix does not swing the camera.
+  function heading() {
+    const ahead = stateAt(Math.min(storyLength, storyPos + 0.9));
+    const behind = stateAt(Math.max(0, storyPos - 0.3));
+    if (distM(behind, ahead) < 15) return null;
+    return bearingBetween(behind, ahead);
+  }
+  // Zoom so the car covers ~140 px a second on screen at the current replay speed.
+  function zoomFor(st) {
+    const dS = 0.5;
+    const a = stateAt(Math.max(0, storyPos - dS)), b = stateAt(Math.min(storyLength, storyPos + dS));
+    const metersPerSecond = (distM(a, b) / (2 * dS)) * Math.max(speed, 0.5);
+    if (metersPerSecond < 1) return null;
+    const metersPerPixel = metersPerSecond / 140;
+    const z = Math.log2((78271.517 * Math.cos((st.lat * Math.PI) / 180)) / metersPerPixel);
+    return Math.max(7, Math.min(15, z));
+  }
+
+  return {
+    kind: "gl",
+    whenReady(fn) { ready ? fn() : readyQueue.push(fn); },
+    setDark(d) { gl.setDark(d); },
+    animating() { return !!trans; },
+    startTransition(seconds) {
+      trans = { from: { center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() },
+        k: 0, seconds };
+      cam = null;
+    },
+    resetReached() {
+      stopMarkers.forEach((m) => m.getElement().classList.remove("reached"));
+      endMarker.getElement().classList.remove("reached");
+    },
+    overview() {
+      trans = null;
+      map.fitBounds(bounds, { padding: 60, maxZoom: 15, pitch: 0, bearing: 0, duration: 1200 }, { replay: true });
+    },
+    finish() {
+      endMarker.getElement().classList.add("reached");
+      if (cameraMode === "follow") {
+        trans = null;
+        map.fitBounds(bounds, { padding: 60, maxZoom: 15, pitch: 0, bearing: 0, duration: 1800 }, { replay: true });
+      }
+    },
+    update(st, dt) {
+      progressData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: progressCoords(st) } };
+      const src = map.getSource("replay-done");
+      if (src) src.setData(progressData);
+      car.setLngLat([st.lon, st.lat]);
+      const h = heading();
+      if (h != null) {
+        // Smooth the heading: a time constant of ~0.5 s.
+        const k = dt > 0 ? 1 - Math.exp(-dt / 0.5) : 1;
+        carHeading = dt > 0 ? carHeading + angleDiff(carHeading, h) * k : h;
+      }
+      car.setRotation(carHeading);
+      stopMarks.forEach((g, i) => {
+        stopMarkers[i].getElement().classList.toggle("reached", storyPos >= g.s0);
+      });
+      endMarker.getElement().classList.toggle("reached", storyPos >= storyLength);
+      // Until the first play the whole trip stays in view.
+      if (cameraMode !== "follow" || finished || (!playing && !trans && !cam)) return;
+
+      // Stopped, the zoom holds rather than chase a speed of zero.
+      const zTarget = st.seg.kind === "stop" ? null : zoomFor(st);
+      if (!cam) cam = { zoom: zTarget != null ? zTarget : 13, bearing: carHeading };
+      const kz = dt > 0 ? 1 - Math.exp(-dt / 1.0) : 1;
+      const kb = dt > 0 ? 1 - Math.exp(-dt / 0.7) : 1;
+      if (zTarget != null) cam.zoom += (zTarget - cam.zoom) * kz;
+      cam.bearing += angleDiff(cam.bearing, carHeading) * kb;
+      let view = { center: [st.lon, st.lat], zoom: cam.zoom, bearing: cam.bearing, pitch: PITCH };
+      if (trans) {
+        trans.k = Math.min(1, trans.k + (dt > 0 ? dt / trans.seconds : 0));
+        const e = easeInOut(trans.k), from = trans.from;
+        view = {
+          center: [lerp(from.center.lng, st.lon, e), lerp(from.center.lat, st.lat, e)],
+          zoom: lerp(from.zoom, cam.zoom, e),
+          bearing: from.bearing + angleDiff(from.bearing, cam.bearing) * e,
+          pitch: lerp(from.pitch, PITCH, e),
+        };
+        if (trans.k >= 1) trans = null;
+      }
+      map.jumpTo(view, { replay: true });
+    },
+    remove() { gl.remove(); box.hidden = true; },
+  };
+}
+
+/* ---------- the SVG scene: where MapLibre cannot run ----------
+   The whole trip in view over raster tiles (or none), the car moving along it. */
+const TILE = 256;
+const MAX_TILE_ZOOM = 16; // the gray canvas basemap stops at 16
+function mercX(lon) { return ((lon + 180) / 360) * TILE; }
+function mercY(lat) {
+  const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE;
+}
+
+function svgScene() {
+  document.getElementById("map").hidden = true;
+  const svg = document.getElementById("chart");
+  svg.style.display = "";
+  const NS = "http://www.w3.org/2000/svg";
+  const mk = (name, attrs) => {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  let geom = null, done = null, glow = null, carG = null, stopDots = [], endDot = null;
+  // Camera buttons mean nothing on a fixed map.
+  document.getElementById("cameraSeg").hidden = true;
+
+  function layout() {
+    const width = Math.max(280, document.getElementById("stage").clientWidth || 280);
+    const pad = 24;
+    const xs = points.map((p) => mercX(p.lon)), ys = points.map((p) => mercY(p.lat));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const spanX = Math.max(x1 - x0, 1e-7), spanY = Math.max(y1 - y0, 1e-7);
+    const plotW = width - 2 * pad;
+    const height = Math.round(Math.min(420, Math.max(260, plotW * (spanY / spanX))) + 2 * pad);
+    const plotH = height - 2 * pad;
+    const scale = Math.min(plotW / spanX, plotH / spanY, Math.pow(2, MAX_TILE_ZOOM + 1));
+    const offX = pad + (plotW - spanX * scale) / 2, offY = pad + (plotH - spanY * scale) / 2;
+    const x = (lon) => offX + (mercX(lon) - x0) * scale;
+    const y = (lat) => offY + (mercY(lat) - y0) * scale;
+    geom = { x, y };
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("height", height);
+    svg.replaceChildren();
+    const defs = mk("defs", {});
+    const clip = mk("clipPath", { id: "mapClip" });
+    clip.append(mk("rect", { x: 0, y: 0, width, height, rx: 8 }));
+    defs.append(clip);
+    svg.append(defs);
+    if (TILE_HOST) svg.append(tileLayer(scale, offX, offY, x0, y0, width, height));
+    const d = points.map((p, i) => (i ? "L" : "M") + x(p.lon).toFixed(1) + " " + y(p.lat).toFixed(1)).join(" ");
+    svg.append(mk("path", { d, class: "route-full" }));
+    glow = mk("path", { class: "route-glow" });
+    done = mk("path", { class: "route-done" });
+    svg.append(glow, done);
+    stopDots = stopMarks.map((g) => {
+      const p = points[g.i1];
+      const c = mk("circle", { cx: x(p.lon), cy: y(p.lat), r: g.charging ? 6 : 4.5,
+        fill: g.charging ? "var(--marker-charge)" : "var(--marker-stop)", stroke: "#fff", "stroke-width": 2, opacity: 0.35 });
+      svg.append(c);
+      return c;
+    });
+    const s = points[0], e = points[points.length - 1];
+    svg.append(mk("circle", { cx: x(s.lon), cy: y(s.lat), r: 5, fill: "var(--surface-1)", stroke: "var(--text-primary)", "stroke-width": 2 }));
+    endDot = mk("circle", { cx: x(e.lon), cy: y(e.lat), r: 6, fill: "var(--route)", stroke: "#fff", "stroke-width": 2, opacity: 0 });
+    svg.append(endDot);
+    carG = mk("g", {});
+    carG.innerHTML = '<circle r="13" fill="var(--route)" opacity="0.22"/>'
+      + '<path d="M0 -11 L8 9 L0 5 L-8 9 Z" fill="var(--route)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>';
+    svg.append(carG);
+    if (TILE_HOST) {
+      const attr = mk("text", { x: width - 6, y: height - 5, "text-anchor": "end", class: "attribution" });
+      attr.textContent = "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors";
+      svg.append(attr);
+    }
+  }
+
+  let heading = 0;
+  return {
+    kind: "svg",
+    layout,
+    whenReady(fn) { fn(); },
+    animating() { return false; },
+    startTransition() {},
+    resetReached() {},
+    overview() {},
+    finish() {},
+    update(st, dt) {
+      if (!geom) return;
+      const d = progressCoords(st).map(([lon, lat], i) => (i ? "L" : "M") + geom.x(lon).toFixed(1) + " " + geom.y(lat).toFixed(1)).join(" ");
+      done.setAttribute("d", d);
+      glow.setAttribute("d", d);
+      const ahead = stateAt(Math.min(storyLength, storyPos + 0.9)), behind = stateAt(Math.max(0, storyPos - 0.3));
+      if (distM(behind, ahead) >= 15) {
+        // Screen-space heading: the map is north-up Mercator.
+        const h = Math.atan2(geom.x(ahead.lon) - geom.x(behind.lon), -(geom.y(ahead.lat) - geom.y(behind.lat))) * 180 / Math.PI;
+        const k = dt > 0 ? 1 - Math.exp(-dt / 0.5) : 1;
+        heading += angleDiff(heading, h) * k;
+      }
+      carG.setAttribute("transform", "translate(" + geom.x(st.lon).toFixed(1) + " " + geom.y(st.lat).toFixed(1) + ") rotate(" + heading.toFixed(1) + ")");
+      stopMarks.forEach((g, i) => stopDots[i].setAttribute("opacity", storyPos >= g.s0 ? 1 : 0.35));
+      endDot.setAttribute("opacity", storyPos >= storyLength ? 1 : 0);
+    },
+    remove() { svg.replaceChildren(); svg.style.display = "none"; },
+  };
+}
+
+// Basemap tiles covering the viewport. The tile zoom is the largest one not
+// finer than the view; tiles are then scaled up by at most 2x to fit exactly.
+function tileLayer(scale, offX, offY, x0, y0, width, height) {
+  const NS = "http://www.w3.org/2000/svg";
+  const z = Math.max(0, Math.min(MAX_TILE_ZOOM, Math.floor(Math.log2(scale))));
+  const n = Math.pow(2, z);
+  const tilePx = (TILE / n) * scale;
+  const wx0 = x0 + (0 - offX) / scale, wx1 = x0 + (width - offX) / scale;
+  const wy0 = y0 + (0 - offY) / scale, wy1 = y0 + (height - offY) / scale;
+  const tx0 = Math.floor((wx0 / TILE) * n), tx1 = Math.floor((wx1 / TILE) * n);
+  const ty0 = Math.max(0, Math.floor((wy0 / TILE) * n));
+  const ty1 = Math.min(n - 1, Math.floor((wy1 / TILE) * n));
+  const style = isDark() ? "World_Dark_Gray_Base" : "World_Light_Gray_Base";
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("clip-path", "url(#mapClip)");
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const wrapped = ((tx % n) + n) % n;
+      const img = document.createElementNS(NS, "image");
+      // Esri MapServer tile order is z/row/column (y before x).
+      img.setAttribute("href", TILE_HOST + "/ArcGIS/rest/services/Canvas/" + style + "/MapServer/tile/"
+        + z + "/" + ty + "/" + wrapped);
+      img.setAttribute("x", (offX + ((tx * TILE) / n - x0) * scale).toFixed(2));
+      img.setAttribute("y", (offY + ((ty * TILE) / n - y0) * scale).toFixed(2));
+      // +0.5px overlap hides hairline seams between scaled tiles.
+      img.setAttribute("width", (tilePx + 0.5).toFixed(2));
+      img.setAttribute("height", (tilePx + 0.5).toFixed(2));
+      img.setAttribute("preserveAspectRatio", "none");
+      img.addEventListener("error", () => img.remove());
+      g.append(img);
+    }
+  }
+  return g;
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+let lastWidth = 0;
+new ResizeObserver(() => {
+  const w = document.getElementById("root").clientWidth;
+  if (points.length && w !== lastWidth) { lastWidth = w; render(); } else reportSize();
+}).observe(document.getElementById("root"));
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render());
+}
+</script>
+</body>
+</html>

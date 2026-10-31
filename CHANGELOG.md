@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **`show_trip_replay`**: a trip played back as an animation in the
+  conversation, no video rendered. The car drives the GPS track on a tilted
+  map that follows it, turning with the road and zooming out as playback
+  speeds up; the route draws in behind it. A heads-up display counts clock
+  time, speed, battery, distance, and elevation; each stop comes up as a card
+  (charging stops with their battery gain) and a summary card ends the trip.
+  Play/pause, a scrubber that also shows battery level and stops, ½× to 4×,
+  and follow or overview camera. Driving plays in about 10 s plus 4 s per
+  hour driven (at most 36 s), shared between stretches by both the time they
+  took and the ground they covered, so city traffic does not eat the replay;
+  every stop gets a short beat. Same rows as `get_trip_route`; where MapLibre cannot run, the car
+  moves over the static map instead.
+
 ### Fixed
 - On Windows the server could not reach Postgres: asyncio's default Proactor
   loop is one psycopg's async connection refuses, so every tool call failed

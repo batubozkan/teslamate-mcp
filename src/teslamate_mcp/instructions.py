@@ -35,7 +35,7 @@ def build_instructions(settings: Settings) -> str:
         "Is anything wrong (logging stopped, a tire losing pressure, high drain, "
         "not sleeping, low battery): `get_health_checks` first.",
         "- Journeys: `get_trips` (TeslaMate ends a drive at every stop, so a journey "
-        "is several drives). Single drives: `search_drives` (with consumption "
+        "is several drives); replay one as an animation: `show_trip_replay`. Single drives: `search_drives` (with consumption "
         "against the usual at that temperature), `get_drive_details`. A commute or "
         "any route driven again and again: `get_frequent_routes`. When the car is "
         "driven: `get_driving_hours`. How it is driven (hard acceleration and "

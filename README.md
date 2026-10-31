@@ -98,7 +98,7 @@ The **[Unraid + Cloudflare deployment guide](deploy/unraid/UNRAID_CLOUDFLARE_DEP
 
 The guide includes the exact dashboard fields, verification commands for each phase, and a troubleshooting table.
 
-> The portal rewrites `ui://` resource URIs, so the interactive charts (`show_*` tools) do not render through it. To get them, connect Claude through Cloudflare Access directly. The guide's [direct connection](deploy/unraid/UNRAID_CLOUDFLARE_DEPLOYMENT.md#phase-3b--direct-connection-for-interactive-charts) section shows how.
+> The interactive charts (`show_*` tools) render through the portal in claude.ai. After an upgrade, run **Sync capabilities** on the portal so it picks up new chart tools. If your client still shows only the data rows, connect Claude through Cloudflare Access directly. The guide's [direct connection](deploy/unraid/UNRAID_CLOUDFLARE_DEPLOYMENT.md#phase-3b--direct-connection-optional) section shows how.
 
 ## Tools
 

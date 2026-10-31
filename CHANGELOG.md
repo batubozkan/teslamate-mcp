@@ -10,6 +10,13 @@ All notable changes to this project are documented in this file. The format foll
   and `/health` returned 503. `stdio` and `http` now select the selector event
   loop first. From upstream (#16 there, by PerryLink).
 
+### Documentation
+- The README, the Unraid deployment guide and the template no longer say the
+  `show_*` charts need the direct Cloudflare Access connection. claude.ai
+  renders them through the MCP portal (checked 2026-10-24); the direct path is
+  now an optional fallback, and the troubleshooting row starts with
+  **Sync capabilities**.
+
 ## [0.17.0] - 2026-10-24
 
 ### Added

@@ -208,12 +208,13 @@ capabilities, and the server status becomes **Ready** (27 tools with writes enab
 After deploying a new server version with added/changed tools, force **⋯ → Sync capabilities**
 on the MCP server entry (auto-resync is ~2h).
 
-> **MCP Apps charts do not render through the portal.** The portal namespaces every
-> resource URI (`ui://teslamate/drive-route.html` is only readable as
-> `teslamate-mcp_ui://teslamate/drive-route.html`) and leaves the `ui://` resources out of
-> `resources/list`, so the host cannot load the chart a `show_*` tool points at and falls
-> back to the plain data rows. Cloudflare has not shipped MCP Apps support for portals
-> (checked 2026-09-30). For charts, use the direct connection in **Phase 3b**.
+> **MCP Apps charts render through the portal.** The portal still namespaces resource
+> URIs (`teslamate://queries` is listed as `teslamate-mcp_teslamate://queries`) and leaves
+> the `ui://` resources out of `resources/list`. Even so, claude.ai loads the chart a
+> `show_*` tool points at: `show_driven_roads` drew its map through the portal on
+> 2026-10-24. On 2026-09-30 the same setup showed only the data rows, so if your client
+> falls back to rows, run **Sync capabilities** first, then try the direct connection in
+> **Phase 3b**.
 
 ### 3.2 Create the portal
 
@@ -255,11 +256,13 @@ The portal endpoint is now: **`https://mcp.your-domain.com/mcp`**
 
 ---
 
-## Phase 3b — Direct connection (for interactive charts)
+## Phase 3b — Direct connection (optional)
 
 Optional, and it can run alongside the portal. Claude signs in through a Cloudflare Access
 application on a second tunnel hostname and talks to the container directly, so `ui://`
-URIs arrive unchanged and the `show_*` charts render. Requires **0.11.0+**.
+URIs arrive unchanged. The charts render through the portal too (see the note in 3.1), so
+use this path when your client does not show them there, or when you want to skip the
+portal altogether. Requires **0.11.0+**.
 
 ```
 claude.ai ──OAuth (Access Managed OAuth)──► https://teslamate-direct.your-domain.com/mcp
@@ -293,8 +296,9 @@ claude.ai ──OAuth (Access Managed OAuth)──► https://teslamate-direct.y
    Keep `AUTH_TOKEN` set; the portal path still uses it. The container log should show
    `Cloudflare Access authentication enabled`.
 6. **Connect**: claude.ai → Settings → Connectors → Add custom connector →
-   `https://teslamate-direct.your-domain.com/mcp` → Connect → Access login. Then disconnect
-   the portal connector so Claude doesn't pick the chart-less copy of each tool. Try
+   `https://teslamate-direct.your-domain.com/mcp` → Connect → Access login. If the portal
+   connector also serves teslamate-mcp, disconnect one of them so Claude doesn't see each
+   tool twice. Try
    *"Show me the route of my last drive."*
 
 A request to `/mcp` needs either the static token or an assertion signed by your Access
@@ -402,7 +406,7 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 | Portal server stuck "Sync Required" | Re-save the custom header credentials; **⋯ → Sync capabilities** |
 | Sync fails `HTTP 403` / `Error POSTing to endpoint: error code: 1003` | Trailing-slash mismatch: the portal's saved hostname ends in `/mcp/` (SDK v1's canonical form, and the hostname field is immutable) while SDK v2 serves `/mcp` and 307-redirects `/mcp/`; uvicorn's redirect behind the tunnel has a malformed `Location`, which Cloudflare rejects as 1003. Fixed in **0.6.1** — the server normalizes `/mcp/` to `/mcp`, so both forms answer directly. Upgrade the container, then **Sync capabilities** |
 | claude.ai "Authorization failed" at Connect | Known Managed-OAuth/connector issue — see Phase 4 fallbacks |
-| `show_*` tools return rows but no chart | Connected through the portal, which rewrites `ui://` URIs; use the direct connection (Phase 3b) |
+| `show_*` tools return rows but no chart | The portal's tool list may predate the chart tools: **⋯ → Sync capabilities**. If the client still shows only rows, use the direct connection (Phase 3b) |
 | Direct hostname: `401 Authorization required` after a successful Access login | `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` not set on the container, or the AUD tag belongs to another application; the container log shows `Rejected Cloudflare Access assertion: …` for a wrong AUD |
 | Tools list stale after adding a query | Portal syncs ~2h; force with **Sync capabilities** |
 

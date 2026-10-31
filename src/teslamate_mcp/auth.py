@@ -7,8 +7,8 @@ Two credentials are accepted on /mcp routes, either one sufficient:
 - `Cf-Access-Jwt-Assertion: <jwt>` — the signed assertion Cloudflare Access adds
   to every request it lets through. Verifying it (signature against the team's
   published keys, issuer, audience, expiry) lets MCP clients sign in through
-  Access Managed OAuth and reach the server directly, without the portal —
-  which rewrites `ui://` resource URIs and so breaks MCP Apps charts.
+  Access Managed OAuth and reach the server directly, without the portal,
+  which rewrites resource URIs on the way through.
 """
 
 from __future__ import annotations

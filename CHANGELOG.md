@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-01
+
 ### Fixed
 - `show_trip_replay` seemed to teleport at the start and then rush through
   the first drive. The car started moving while the camera was still flying

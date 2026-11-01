@@ -202,13 +202,13 @@ APP_SPECS: tuple[AppSpec, ...] = (
         resource_title="Trip replay",
         resource_description=(
             "Animated replay of a multi-drive trip: the car drives the route on a tilted, "
-            "following map with live speed, battery, and stop cards."
+            "following map with a live clock, battery, distance, and stop cards."
         ),
         tool_description=(
             "Play a trip back as an animation, displayed directly in the "
             "conversation: the car drives the GPS track on a tilted map that "
             "follows it, the route draws in behind it, a heads-up display counts "
-            "clock time, speed, battery, distance, and elevation, every stop "
+            "clock time, battery, and distance driven, every stop "
             "comes up as a card (charging stops with their battery gain), and a "
             "summary card closes the trip. Play/pause, a scrubber that also "
             "shows battery level and stops, playback speed, and follow or "

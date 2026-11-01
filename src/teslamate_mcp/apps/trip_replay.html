@@ -552,6 +552,10 @@ function renderSummary() {
 let storyPos = 0, playing = false, speed = 1, finished = false, autoplayPending = false;
 let cameraMode = "follow"; // follow | overview | free (the user moved the map)
 let raf = 0, lastFrame = 0;
+// Playback seconds the car waits while the camera flies in from the whole-trip
+// view, so the first drive is not half over by the time the camera arrives.
+let introHold = 0;
+const INTRO_SECONDS = 2.2;
 
 function play() {
   if (!points.length) return;
@@ -559,7 +563,12 @@ function play() {
   playing = true;
   finished = false;
   showSummary(false);
-  if (cameraMode === "follow" && scene) scene.startTransition(1.4);
+  introHold = 0;
+  if (cameraMode === "follow" && scene) {
+    const intro = scene.kind === "gl" && storyPos <= LEAD_IN;
+    scene.startTransition(intro ? INTRO_SECONDS : 1.4);
+    if (intro) introHold = INTRO_SECONDS;
+  }
   updateButtons();
   lastFrame = 0;
   cancelAnimationFrame(raf);
@@ -587,7 +596,9 @@ function seek(s) {
 function tick(now) {
   const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  if (playing) {
+  if (playing && introHold > 0) {
+    introHold = Math.max(0, introHold - dt);
+  } else if (playing) {
     storyPos += dt * speed;
     if (storyPos >= storyLength) {
       storyPos = storyLength;
@@ -954,10 +965,12 @@ function glScene() {
     car.setRotation((Math.atan2(p1.x - p0.x, -(p1.y - p0.y)) * 180) / Math.PI);
   }
   map.on("move", orientCar);
-  // Zoom so the car covers ~140 px a second on screen at the current replay speed.
+  // Zoom so the car covers ~140 px a second on screen at the current replay
+  // speed. The window skips the lead-in, where the car has not moved yet.
   function zoomFor(st) {
     const dS = 0.5;
-    const a = stateAt(Math.max(0, storyPos - dS)), b = stateAt(Math.min(storyLength, storyPos + dS));
+    const s0 = Math.max(LEAD_IN, Math.min(storyPos - dS, storyLength - 2 * dS));
+    const a = stateAt(s0), b = stateAt(Math.min(storyLength, s0 + 2 * dS));
     const metersPerSecond = (distM(a, b) / (2 * dS)) * Math.max(speed, 0.5);
     if (metersPerSecond < 1) return null;
     const metersPerPixel = metersPerSecond / 140;

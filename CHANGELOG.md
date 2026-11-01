@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-01
+
+### Fixed
+- `show_trip_replay` seemed to teleport at the start and then rush through
+  the first drive. The car started moving while the camera was still flying
+  in from the whole-trip view, so on a real trip the first drive (40 min
+  across a city) was over half done before the camera arrived. The car now
+  waits for the 2.2 s fly-in. The follow zoom also measured the car's pace
+  over the lead-in, where it has not moved yet, and so zoomed in too close
+  at the start.
+
 ## [0.18.2] - 2026-11-01
 
 ### Fixed

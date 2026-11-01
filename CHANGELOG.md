@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-01
+
+### Changed
+- `show_trip_replay` is plainer. The heads-up display is one compact line
+  (clock, battery, distance), without speed or elevation. The closing card
+  shows the distance, the time span, driving time, stops, and battery,
+  without speed or the highest point.
+
+### Fixed
+- In `show_trip_replay`'s follow camera, the car arrow pointed straight up
+  the screen whatever the road did, because the camera turned as fast as
+  the car. The arrow now follows the road as drawn on the tilted map, and the
+  camera turns more slowly, over about a screen's length of road.
+
 ## [0.18.0] - 2026-11-01
 
 ### Added

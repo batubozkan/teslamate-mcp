@@ -139,7 +139,9 @@
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
   }
   .car svg { display: block; width: 100%; height: 100%; }
-  .tm-dot.stop, .tm-dot.charge { opacity: 0.35; transition: opacity 0.4s, transform 0.4s; }
+  /* Opacity only: MapLibre places markers with transform, and easing that
+     leaves them trailing the map while the camera moves. */
+  .tm-dot.stop, .tm-dot.charge { opacity: 0.35; transition: opacity 0.4s; }
   .tm-dot.reached { opacity: 1; }
   .tm-dot.end { opacity: 0; transition: opacity 0.4s; }
   .tm-dot.end.reached { opacity: 1; }

@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-11-01
+
+### Fixed
+- `show_trip_replay`'s stop and charging markers drifted away from the route
+  while the follow camera moved (by over 1000 px on a long trip), and only
+  settled once the map held still. Their fade-in also eased `transform`,
+  which MapLibre uses to place markers; now only the opacity eases.
+
 ## [0.18.1] - 2026-11-01
 
 ### Changed

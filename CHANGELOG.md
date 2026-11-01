@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-01
+
 ### Changed
 - `show_trip_replay` is plainer. The heads-up display is one compact line
   (clock, battery, distance), without speed or elevation. The closing card

@@ -197,12 +197,16 @@ request("ui/initialize", {
 /* ---------- data handling ---------- */
 let rows = [];
 let hoverIndex = -1;
+// What the tool was asked for, when it narrowed the data; the subtitle shows
+// it in place of the generic line.
+let inputSubtitle = null;
 
 function onToolInput(args) {
   const bits = [];
   if (args && args.car_name) bits.push('cars matching "' + args.car_name + '"');
   if (args && args.days) bits.push("last " + args.days + " days");
-  if (bits.length) setText("subtitle", bits.join(" · "));
+  inputSubtitle = bits.length ? bits.join(" · ") : null;
+  if (inputSubtitle) setText("subtitle", inputSubtitle);
 }
 
 /* Rows come from structuredContent.result; hosts that pass the result through
@@ -235,22 +239,26 @@ function onToolResult(result) {
     showState("No drives with temperature and consumption data found.");
     return;
   }
-  document.getElementById("state").hidden = true;
-  document.getElementById("stats").hidden = false;
-  document.getElementById("legend").hidden = false;
-  document.getElementById("chartWrap").hidden = false;
-  document.getElementById("tableWrap").hidden = false;
+  showData();
   renderStats();
   renderLegend();
   renderTable();
   render();
 }
 
+// The view shows either a message or the data, never both: a cancel or a
+// failed result after a good one must not leave the old chart under it.
+const DATA_PANELS = ["stats", "legend", "chartWrap", "tableWrap"];
 function showState(text) {
   const el = document.getElementById("state");
   el.hidden = false;
   el.textContent = text;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = true;
   reportSize();
+}
+function showData() {
+  document.getElementById("state").hidden = true;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = false;
 }
 function setText(id, text) { document.getElementById(id).textContent = text; }
 
@@ -324,9 +332,7 @@ function renderStats() {
     d.append(dv, dl);
     return d;
   }));
-  if (document.getElementById("subtitle").textContent === "Waiting for data…") {
-    setText("subtitle", "One dot per drive, sized by distance");
-  }
+  setText("subtitle", inputSubtitle || "One dot per drive, sized by distance");
 }
 
 function renderLegend() {

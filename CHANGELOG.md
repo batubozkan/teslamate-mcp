@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Fixed
+- The chart and map views could show a message over the old chart: a
+  cancelled call, or a failed result after a good one, revealed the message
+  but left the data panels visible. A view now shows either the message or
+  the data.
+- `show_visited_places`, `show_driven_roads`, and
+  `show_efficiency_vs_temperature` kept a subtitle from an earlier call's
+  arguments when a later call had none. The subtitle now comes from the
+  latest arguments, or the generic line when there are none.
+- `show_trip_replay`: stepping back from the end with the arrow keys or the
+  timeline left the button reading "Replay". The end state is now read from
+  the playback position instead of a separate flag. When the basemap fails
+  and the SVG map takes over before playback starts, the replay now still
+  starts on its own.
+
 ## [0.18.3] - 2026-11-01
 
 ### Fixed

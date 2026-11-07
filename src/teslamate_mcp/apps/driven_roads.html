@@ -202,13 +202,16 @@ request("ui/initialize", {
 
 /* ---------- data handling ---------- */
 let rows = [];
-let subtitleSet = false;
+// What the tool was asked for, when it narrowed the data; the subtitle shows
+// it in place of the generic line.
+let inputSubtitle = null;
 
 function onToolInput(args) {
   const bits = [];
   if (args && args.car_name) bits.push('cars matching "' + args.car_name + '"');
   if (args && args.days) bits.push("last " + args.days + " days");
-  if (bits.length) { setText("subtitle", bits.join(" · ")); subtitleSet = true; }
+  inputSubtitle = bits.length ? bits.join(" · ") : null;
+  if (inputSubtitle) setText("subtitle", inputSubtitle);
 }
 
 /* Rows come from structuredContent.result; hosts that pass the result through
@@ -242,20 +245,25 @@ function onToolResult(result) {
     showState("No drives with a GPS track found.");
     return;
   }
-  document.getElementById("state").hidden = true;
-  document.getElementById("stats").hidden = false;
-  document.getElementById("chartWrap").hidden = false;
-  document.getElementById("tableWrap").hidden = false;
+  showData();
   renderStats();
   renderTable();
   render();
 }
 
+// The view shows either a message or the data, never both: a cancel or a
+// failed result after a good one must not leave the old chart under it.
+const DATA_PANELS = ["stats", "chartWrap", "tableWrap"];
 function showState(text) {
   const el = document.getElementById("state");
   el.hidden = false;
   el.textContent = text;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = true;
   reportSize();
+}
+function showData() {
+  document.getElementById("state").hidden = true;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = false;
 }
 function setText(id, text) { document.getElementById(id).textContent = text; }
 
@@ -325,7 +333,7 @@ function renderStats() {
     d.append(dv, dl);
     return d;
   }));
-  if (!subtitleSet) setText("subtitle", "Every road driven; a route driven many times is drawn once");
+  setText("subtitle", inputSubtitle || "Every road driven; a route driven many times is drawn once");
 }
 
 function renderTable() {

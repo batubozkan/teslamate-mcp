@@ -367,10 +367,8 @@ function onToolResult(result) {
   renderSubtitle();
   renderSummary();
   storyPos = 0;
-  finished = false;
   lastHud = "";
   cardFor = null;
-  autoplayPending = !reducedMotion();
   if (reducedMotion()) cameraMode = "overview";
   render();
 }
@@ -549,19 +547,20 @@ function renderSummary() {
 }
 
 /* ---------- playback ---------- */
-let storyPos = 0, playing = false, speed = 1, finished = false, autoplayPending = false;
+let storyPos = 0, playing = false, speed = 1;
 let cameraMode = "follow"; // follow | overview | free (the user moved the map)
 let raf = 0, lastFrame = 0;
 // Playback seconds the car waits while the camera flies in from the whole-trip
 // view, so the first drive is not half over by the time the camera arrives.
 let introHold = 0;
 const INTRO_SECONDS = 2.2;
+// The replay has ended when its clock stands at the end, however it got there.
+function atEnd() { return storyLength > 0 && storyPos >= storyLength; }
 
 function play() {
   if (!points.length) return;
   if (storyPos >= storyLength) restart();
   playing = true;
-  finished = false;
   showSummary(false);
   introHold = 0;
   if (cameraMode === "follow" && scene) {
@@ -581,13 +580,12 @@ function pause() {
 }
 function restart() {
   storyPos = 0;
-  finished = false;
   if (scene) scene.resetReached();
 }
 function seek(s) {
   storyPos = Math.max(0, Math.min(storyLength, s));
-  finished = false;
   showSummary(false);
+  updateButtons();
   if (scene && cameraMode === "follow") scene.startTransition(0.5);
   frame(0);
   if (!playing && scene && scene.animating()) { lastFrame = 0; raf = requestAnimationFrame(tick); }
@@ -603,11 +601,10 @@ function tick(now) {
     if (storyPos >= storyLength) {
       storyPos = storyLength;
       playing = false;
-      finished = true;
       updateButtons();
       frame(dt);
       if (scene) scene.finish();
-      setTimeout(() => { if (finished) showSummary(true); }, 900);
+      setTimeout(() => { if (!playing && atEnd()) showSummary(true); }, 900);
       return;
     }
   }
@@ -673,8 +670,8 @@ const PAUSE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="tr
 const REPLAY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
 function updateButtons() {
   const btn = document.getElementById("playBtn");
-  btn.innerHTML = playing ? PAUSE_ICON : (finished ? REPLAY_ICON : PLAY_ICON);
-  btn.setAttribute("aria-label", playing ? "Pause" : (finished ? "Replay" : "Play"));
+  btn.innerHTML = playing ? PAUSE_ICON : (atEnd() ? REPLAY_ICON : PLAY_ICON);
+  btn.setAttribute("aria-label", playing ? "Pause" : (atEnd() ? "Replay" : "Play"));
   for (const b of document.querySelectorAll("#speedSeg button")) {
     b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed));
   }
@@ -819,17 +816,20 @@ function routeColor() {
 function render() {
   if (!points.length || glMode === "pending") { reportSize(); return; }
   if (scene && scene.kind === "gl") scene.setDark(isDark());
-  if (!scene && glMode === "on") { scene = glScene(); if (!scene) glMode = "off"; }
-  if (!scene && glMode === "off") scene = svgScene();
+  if (!scene) {
+    if (glMode === "on") scene = glScene();
+    if (!scene) { glMode = "off"; scene = svgScene(); }
+    // Each new scene (new rows, or the SVG map taking over from a failed
+    // basemap) plays the trip once its map is ready, unless it already began.
+    if (!reducedMotion()) {
+      scene.whenReady(() => setTimeout(() => { if (!playing && storyPos === 0) play(); }, 500));
+    }
+  }
   if (scene && scene.kind === "svg") scene.layout();
   renderTimeline();
   updateButtons();
   frame(0);
   reportSize();
-  if (autoplayPending && scene) {
-    autoplayPending = false;
-    scene.whenReady(() => setTimeout(() => { if (!playing && storyPos === 0) play(); }, 500));
-  }
 }
 
 function bearingBetween(a, b) {
@@ -1025,8 +1025,10 @@ function glScene() {
         stopMarkers[i].getElement().classList.toggle("reached", storyPos >= g.s0);
       });
       endMarker.getElement().classList.toggle("reached", storyPos >= storyLength);
-      // Until the first play the whole trip stays in view.
-      if (cameraMode !== "follow" || finished || (!playing && !trans && !cam)) return;
+      // The camera holds still while paused with no move of its own to finish:
+      // before the first play the whole trip stays in view, and at the end the
+      // overview that finish() flies to stays put.
+      if (cameraMode !== "follow" || (!playing && !trans && (!cam || atEnd()))) return;
       // (jumpTo below fires "move", which turns the car for the new view.)
 
       // Stopped, the zoom holds rather than chase a speed of zero.

@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-11-10
+
 ### Fixed
 - The chart and map views could show a message over the old chart: a
   cancelled call, or a failed result after a good one, revealed the message

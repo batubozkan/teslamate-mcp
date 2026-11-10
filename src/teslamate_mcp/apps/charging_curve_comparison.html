@@ -238,22 +238,26 @@ function onToolResult(result) {
     showState("No charging samples found for these sessions.");
     return;
   }
-  document.getElementById("state").hidden = true;
-  document.getElementById("stats").hidden = false;
-  document.getElementById("legend").hidden = false;
-  document.getElementById("chartWrap").hidden = false;
-  document.getElementById("tableWrap").hidden = false;
+  showData();
   renderStats();
   renderLegend();
   renderTable();
   render();
 }
 
+// The view shows either a message or the data, never both: a cancel or a
+// failed result after a good one must not leave the old chart under it.
+const DATA_PANELS = ["stats", "legend", "chartWrap", "tableWrap"];
 function showState(text) {
   const el = document.getElementById("state");
   el.hidden = false;
   el.textContent = text;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = true;
   reportSize();
+}
+function showData() {
+  document.getElementById("state").hidden = true;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = false;
 }
 function setText(id, text) { document.getElementById(id).textContent = text; }
 

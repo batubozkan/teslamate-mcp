@@ -222,17 +222,23 @@ function onToolResult(result) {
     showState("Nothing to recap for this period.");
     return;
   }
-  document.getElementById("state").hidden = true;
-  document.getElementById("content").hidden = false;
-  document.getElementById("tableWrap").hidden = false;
+  showData();
   render();
 }
 
+// The view shows either a message or the data, never both: a cancel or a
+// failed result after a good one must not leave the old chart under it.
+const DATA_PANELS = ["content", "tableWrap"];
 function showState(text) {
   const el = document.getElementById("state");
   el.hidden = false;
   el.textContent = text;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = true;
   reportSize();
+}
+function showData() {
+  document.getElementById("state").hidden = true;
+  for (const id of DATA_PANELS) document.getElementById(id).hidden = false;
 }
 function setText(id, text) { document.getElementById(id).textContent = text; }
 function make(tag, cls, text) {

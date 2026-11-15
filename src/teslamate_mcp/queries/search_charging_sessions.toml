@@ -1,5 +1,5 @@
 name = "search_charging_sessions"
-description = "Search individual charging sessions with flexible filters: date range (local calendar dates), car, free-text location match, and minimum energy added (kWh). Returns charging_process_id (usable with get_charging_curve), timestamps, energy added kWh, duration, cost, and location. Newest first; 50 rows max by default."
+description = "Search individual charging sessions with flexible filters: date range (local calendar dates), car, free-text location match (geofence name, address, or city), and minimum energy added (kWh). Lists finished sessions that added energy; a charge in progress shows in get_timeline. Returns charging_process_id (usable with get_charging_curve), timestamps, energy added kWh, duration, cost, and location (the geofence name when the session has one, else the address). Newest first; 50 rows max by default."
 
 [[params]]
 name = "car_name"
@@ -19,7 +19,7 @@ description = "Latest local calendar date to include, ISO format (YYYY-MM-DD)."
 [[params]]
 name = "location"
 type = "string"
-description = "Case-insensitive substring matched against the charging address name and city."
+description = "Case-insensitive substring matched against the geofence name, the charging address name, and the city."
 
 [[params]]
 name = "min_energy_kwh"

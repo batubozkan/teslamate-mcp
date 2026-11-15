@@ -1,5 +1,5 @@
 name = "get_odometer_history"
-description = "The odometer over time: per local month and car, the odometer reading at the first and last drive (km), the distance driven, the number of drives, and the days with a drive, oldest month first. Months without a drive are left out. Covers all time by default. Optional filters: car_name, days."
+description = "The odometer over time: per local month and car, the odometer reading at the first and last drive (km), the distance driven, the number of drives, and the days with a drive, oldest month first. Months without a drive are left out. Covers all time by default; with `days`, the window starts with the month that many days ago falls in, so the first month is a whole one. Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[output]]

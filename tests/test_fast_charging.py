@@ -55,7 +55,7 @@ async def test_fast_charging_by_location(mcp_session) -> None:
     assert [r["location"] for r in fastest] == ["Tesla Supercharger Gebze", "Outlet DC Charger"]
     gebze = fastest[0]
     assert (gebze["sessions"], gebze["best_peak_power_kw"]) == (1, 150)
-    assert gebze["avg_cost_per_kwh"] == 0.5
+    assert gebze["avg_cost_per_kwh"] == 0.475  # 38.00 over the 80 kWh drawn, not the 76 added
     assert fastest[1]["sessions_with_battery_heating"] == 1
     assert fastest[1]["avg_cost_per_kwh"] is None  # no costed session there
 

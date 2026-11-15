@@ -590,6 +590,15 @@ function restart() {
   storyPos = 0;
   if (scene) scene.resetReached();
 }
+// The replay is over (playback has already stopped): the end marker lights
+// up, a following camera pulls back to the whole trip, and the summary comes.
+let summaryTimer = 0;
+function finish() {
+  updateButtons();
+  if (scene) scene.finish();
+  clearTimeout(summaryTimer);
+  summaryTimer = setTimeout(() => showSummary(true), 900);
+}
 function seek(s) {
   storyPos = Math.max(0, Math.min(storyLength, s));
   showSummary(false);
@@ -613,10 +622,8 @@ function tick(now) {
     if (storyPos >= storyLength) {
       storyPos = storyLength;
       playing = false;
-      updateButtons();
       frame(dt);
-      if (scene) scene.finish();
-      setTimeout(() => { if (!playing && atEnd()) showSummary(true); }, 900);
+      finish();
       return;
     }
   }
@@ -675,7 +682,10 @@ function renderCard(st) {
   card.classList.add("show");
 }
 
-function showSummary(on) { document.getElementById("summary").classList.toggle("show", on); }
+function showSummary(on) {
+  if (!on) clearTimeout(summaryTimer); // whatever hides it also calls off one on its way
+  document.getElementById("summary").classList.toggle("show", on);
+}
 
 const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
 const PAUSE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1.2"/><rect x="14" y="4" width="5" height="16" rx="1.2"/></svg>';
@@ -715,10 +725,15 @@ document.getElementById("cameraSeg").addEventListener("click", (ev) => {
 document.getElementById("root").addEventListener("keydown", (ev) => {
   if (!points.length || ev.target.closest("button")) return;
   if (ev.key === " " || ev.key === "k") { ev.preventDefault(); playing ? pause() : play(); }
-  else if (ev.key === "ArrowRight") { ev.preventDefault(); seek(storyPos + storyLength * 0.05); }
+  else if (ev.key === "ArrowRight" || ev.key === "End") {
+    ev.preventDefault();
+    if (atEnd()) return;
+    seek(ev.key === "End" ? storyLength : storyPos + storyLength * 0.05);
+    // Paused, nothing else would end the replay; playing, the next frame does.
+    if (!playing && atEnd()) finish();
+  }
   else if (ev.key === "ArrowLeft") { ev.preventDefault(); seek(storyPos - storyLength * 0.05); }
   else if (ev.key === "Home") { ev.preventDefault(); seek(0); }
-  else if (ev.key === "End") { ev.preventDefault(); seek(storyLength); }
 });
 
 /* ---------- timeline: a scrubber that also shows battery and stops ---------- */
@@ -798,7 +813,12 @@ function updateTimelineHead() {
     seek(at(ev));
   });
   svg.addEventListener("pointermove", (ev) => { if (dragging) seek(at(ev)); });
-  const end = () => { if (!dragging) return; dragging = false; if (wasPlaying) play(); };
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    // Let go at the end, the replay is over; play() there would start it again.
+    if (atEnd()) finish(); else if (wasPlaying) play();
+  };
   svg.addEventListener("pointerup", end);
   svg.addEventListener("pointercancel", end);
 })();
@@ -886,14 +906,6 @@ function offsetPoint(lat, lon, h, meters) {
     lat + (meters * Math.cos(r)) / 111320];
 }
 
-// The track up to the car: every point passed, then the car itself.
-function progressCoords(st) {
-  const out = [];
-  for (let i = 0; i <= st.idx; i++) out.push([points[i].lon, points[i].lat]);
-  out.push([st.lon, st.lat]);
-  return out;
-}
-
 const CAR_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="var(--route)" opacity="0.22"/>'
   + '<path d="M16 4.5 L24.5 26 L16 21.5 L7.5 26 Z" fill="var(--route)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
 
@@ -912,8 +924,19 @@ function glScene() {
   });
   if (!gl) { box.hidden = true; return null; }
   const map = gl.map;
-  const empty = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [track[0], track[0]] } };
-  let progressData = empty;
+  /* The driven line is two features of one source: the track up to a joint,
+     rewritten every CHUNK points, and the tail from the joint to the car,
+     which is all a frame sends to MapLibre's worker (the whole line each
+     frame cost more the further the trip got). Both change in one update, so
+     no frame shows a gap or a doubled stretch. The joint lies halfway between
+     two track points: there the two parts run in one straight line, and the
+     glow's flat ends meet without overlapping (it is translucent, so round
+     ends lying over each other would show as a brighter spot). */
+  const CHUNK = 64, SETTLED = 1, TAIL = 2;
+  const lineString = (coordinates) => ({ type: "LineString", coordinates });
+  const jointBefore = (i) => [(track[i - 1][0] + track[i][0]) / 2, (track[i - 1][1] + track[i][1]) / 2];
+  let tailFrom = 0; // the tail starts at the joint before this track point (0: at the start)
+  let settled = [track[0], track[0]], tail = [track[0], track[0]];
   const drawLayers = () => {
     if (map.getSource("replay-full")) return;
     const color = routeColor();
@@ -921,11 +944,16 @@ function glScene() {
       type: "geojson",
       data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: track } },
     });
-    map.addSource("replay-done", { type: "geojson", data: progressData });
+    map.addSource("replay-done", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [[SETTLED, settled], [TAIL, tail]].map(([id, coords]) => (
+        { type: "Feature", id, properties: {}, geometry: lineString(coords) })) },
+    });
     const layout = { "line-join": "round", "line-cap": "round" };
     map.addLayer({ id: "replay-full", type: "line", source: "replay-full", layout,
       paint: { "line-color": color, "line-width": 3, "line-opacity": 0.3 } });
-    map.addLayer({ id: "replay-glow", type: "line", source: "replay-done", layout,
+    map.addLayer({ id: "replay-glow", type: "line", source: "replay-done",
+      layout: { "line-join": "round", "line-cap": "butt" },
       paint: { "line-color": color, "line-width": 12, "line-blur": 8, "line-opacity": 0.45 } });
     map.addLayer({ id: "replay-done", type: "line", source: "replay-done", layout,
       paint: { "line-color": color, "line-width": 4.5 } });
@@ -1016,9 +1044,25 @@ function glScene() {
       }
     },
     update(st, dt) {
-      progressData = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: progressCoords(st) } };
-      const src = map.getSource("replay-done");
-      if (src) src.setData(progressData);
+      // A frame that leaves the car where it was (paused, the camera moving) has no line to draw.
+      if (!lastSt || st.idx !== lastSt.idx || st.lon !== lastSt.lon || st.lat !== lastSt.lat) {
+        const update = [];
+        let from = Math.floor(st.idx / CHUNK) * CHUNK;
+        // The joint needs a stretch with some length to lie on (the car stood still: two equal points).
+        while (from > 0 && track[from][0] === track[from - 1][0] && track[from][1] === track[from - 1][1]) from--;
+        if (from !== tailFrom) {
+          tailFrom = from;
+          settled = from ? [...track.slice(0, from), jointBefore(from)] : [track[0], track[0]];
+          update.push({ id: SETTLED, newGeometry: lineString(settled) });
+        }
+        tail = from ? [jointBefore(from)] : [];
+        for (let i = from; i <= st.idx; i++) tail.push(track[i]);
+        tail.push([st.lon, st.lat]);
+        update.push({ id: TAIL, newGeometry: lineString(tail) });
+        // Before the style has loaded there is no source yet; drawLayers starts it from these.
+        const src = map.getSource("replay-done");
+        if (src) src.updateData({ update });
+      }
       car.setLngLat([st.lon, st.lat]);
       lastSt = st;
       const mpp = metersPerPixel();
@@ -1089,6 +1133,10 @@ function svgScene() {
     return n;
   };
   let geom = null, done = null, glow = null, carG = null, stopDots = [], endDot = null;
+  // The driven line's path up to the last point passed, kept between frames:
+  // while the replay runs forward a frame adds the points passed since and
+  // the car, instead of writing every point's coordinates again.
+  let pointXY = [], drivenTo = -1, drivenPath = "", carXY = "";
   // Camera buttons mean nothing on a fixed map.
   document.getElementById("cameraSeg").hidden = true;
 
@@ -1115,8 +1163,9 @@ function svgScene() {
     defs.append(clip);
     svg.append(defs);
     if (TILE_HOST) svg.append(tileLayer(scale, offX, offY, x0, y0, width, height));
-    const d = points.map((p, i) => (i ? "L" : "M") + x(p.lon).toFixed(1) + " " + y(p.lat).toFixed(1)).join(" ");
-    svg.append(mk("path", { d, class: "route-full" }));
+    pointXY = points.map((p) => x(p.lon).toFixed(1) + " " + y(p.lat).toFixed(1));
+    drivenTo = -1; // new coordinates: the kept path starts over
+    svg.append(mk("path", { d: "M" + pointXY.join(" L"), class: "route-full" }));
     glow = mk("path", { class: "route-glow" });
     done = mk("path", { class: "route-done" });
     svg.append(glow, done);
@@ -1154,9 +1203,17 @@ function svgScene() {
     finish() {},
     update(st, dt) {
       if (!geom) return;
-      const d = progressCoords(st).map(([lon, lat], i) => (i ? "L" : "M") + geom.x(lon).toFixed(1) + " " + geom.y(lat).toFixed(1)).join(" ");
-      done.setAttribute("d", d);
-      glow.setAttribute("d", d);
+      const cx = geom.x(st.lon), cy = geom.y(st.lat);
+      const xy = cx.toFixed(1) + " " + cy.toFixed(1);
+      if (st.idx !== drivenTo || xy !== carXY) {
+        if (drivenTo < 0 || st.idx < drivenTo) drivenPath = "M" + pointXY.slice(0, st.idx + 1).join(" L");
+        else for (let i = drivenTo + 1; i <= st.idx; i++) drivenPath += " L" + pointXY[i];
+        drivenTo = st.idx;
+        carXY = xy;
+        const d = drivenPath + " L" + xy;
+        done.setAttribute("d", d);
+        glow.setAttribute("d", d);
+      }
       const ahead = alongTrack(st, 300), behind = alongTrack(st, -150);
       if (distM(behind, ahead) >= 10) {
         // Screen-space heading: the map is north-up Mercator.
@@ -1164,7 +1221,7 @@ function svgScene() {
         const k = dt > 0 ? 1 - Math.exp(-dt / 0.15) : 1;
         heading = dt > 0 ? heading + angleDiff(heading, h) * k : h;
       }
-      carG.setAttribute("transform", "translate(" + geom.x(st.lon).toFixed(1) + " " + geom.y(st.lat).toFixed(1) + ") rotate(" + heading.toFixed(1) + ")");
+      carG.setAttribute("transform", "translate(" + cx.toFixed(1) + " " + cy.toFixed(1) + ") rotate(" + heading.toFixed(1) + ")");
       stopMarks.forEach((g, i) => stopDots[i].setAttribute("opacity", storyPos >= g.s0 ? 1 : 0.35));
       endDot.setAttribute("opacity", storyPos >= storyLength ? 1 : 0);
     },
@@ -1209,12 +1266,15 @@ function tileLayer(scale, offX, offY, x0, y0, width, height) {
 
 /* ---------- sizing ---------- */
 let sizeRaf = 0;
+// The root's own height, not the document's scrollHeight: that is never less
+// than the frame, so a host that sizes the frame from this report could not
+// shrink the view again after a result with nothing to replay.
 function reportSize() {
   cancelAnimationFrame(sizeRaf);
   sizeRaf = requestAnimationFrame(() => {
     notify("ui/notifications/size-changed", {
       width: document.documentElement.scrollWidth,
-      height: document.documentElement.scrollHeight,
+      height: Math.ceil(document.getElementById("root").getBoundingClientRect().height),
     });
   });
 }

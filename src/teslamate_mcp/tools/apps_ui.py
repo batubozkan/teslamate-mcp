@@ -145,10 +145,11 @@ APP_SPECS: tuple[AppSpec, ...] = (
         resource_description=("Interactive monthly rated-range trend chart, one line per car."),
         tool_description=(
             "Render an interactive battery-degradation trend chart, displayed "
-            "directly in the conversation (monthly average and best rated range "
-            "at full charge, one line per car, with hover readouts and a data "
-            "table). Returns the same rows as get_battery_degradation_over_time, "
-            "so it also works as a plain data tool. Prefer this over "
+            "directly in the conversation: the monthly average rated range at "
+            "full charge as one line per car, with hover readouts, and a data "
+            "table that adds each month's best range and number of samples. "
+            "Returns the same rows as get_battery_degradation_over_time, so it "
+            "also works as a plain data tool. Prefer this over "
             "get_battery_degradation_over_time when the user wants to SEE the "
             "trend."
         ),

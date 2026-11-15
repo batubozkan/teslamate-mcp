@@ -108,6 +108,13 @@ Tools return metric values (km, km/h, °C, bar, m) and rated range. `get_unit_pr
 
 The server also sends MCP `instructions`: how to read units, time zones and costs, and which tool answers which kind of question.
 
+The tools share one meaning for the words they use:
+
+- **Last N days** is the last N × 24 hours. Tools that bucket by day, week, or month start at the beginning of the first bucket, so the first one is whole.
+- **A drive** is a finished drive, and **a charging session** is a finished charge that added energy. One in progress shows in `get_current_car_status` and `get_timeline`.
+- **A cost** that was never recorded is unknown, not 0: totals leave it out, are empty when no session has a cost, and `sessions_without_cost` counts what is missing. A price per kWh is per kWh billed (drawn from the charger), not per kWh that reached the battery.
+- **A place** is named by its TeslaMate geofence when it has one, else by its address. Location filters match both, and tools that list places give a geofence one row.
+
 ### Reports (28)
 
 | Group | Tools |
@@ -141,7 +148,7 @@ The server also sends MCP `instructions`: how to read units, time zones and cost
 
 ### Timeline and car state (4)
 
-TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now. It also gives the cabin climate and the four tire pressures. Most rows logged while driving have neither, so each group comes from the latest row that has it, with the time of that row.
+TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now. It also gives the cabin climate and the four tire pressures. Most rows logged while driving have neither, and none has the range or the outside temperature, so each group comes from the latest row that has it, with the time of that row.
 
 | Tool | What it returns |
 |---|---|
@@ -163,7 +170,7 @@ TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_
 
 ### Costs (5)
 
-A session with no cost recorded counts as unknown, not free: averages per kWh use only the sessions that have a cost, and each report says how many sessions lack one.
+A session with no cost recorded counts as unknown, not free: totals leave it out (and are empty when no session has a cost), averages per kWh use only the sessions that have a cost and divide by the kWh billed (drawn from the charger), and each report says how many sessions lack one.
 
 | Tool | What it returns |
 |---|---|

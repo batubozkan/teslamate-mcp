@@ -146,11 +146,13 @@ async def test_charging_costs_group_by(mcp_session) -> None:
         by_location = rows_from(
             await session.call_tool("get_charging_costs", {"group_by": "location"})
         )
-        assert {r["group_key"] for r in by_location} == {"Home Street 1", "Supercharger Edirne"}
-        home = next(r for r in by_location if r["group_key"] == "Home Street 1")
-        # 12.50 over the 30 kWh that has a cost, not over all 50 kWh charged there.
+        # The geofence names the place when the session has one.
+        assert {r["group_key"] for r in by_location} == {"Home", "Supercharger Edirne"}
+        home = next(r for r in by_location if r["group_key"] == "Home")
+        # 12.50 over the 33 kWh drawn in the session that has a cost, not over
+        # all the energy charged there.
         assert (home["total_cost"], home["sessions_without_cost"]) == (12.5, 1)
-        assert home["avg_cost_per_kwh"] == 0.4167
+        assert home["avg_cost_per_kwh"] == 0.3788
 
 
 async def test_battery_capacity_trend(mcp_session) -> None:
@@ -215,9 +217,9 @@ async def test_charging_by_geofence_buckets(mcp_session) -> None:
         assert set(buckets) == {"Home", "Ungeofenced"}
         assert buckets["Home"]["sessions"] == 2
         assert buckets["Home"]["kwh_added"] == 50.0
-        # 12.50 / 30 kWh: Red Rocket's 20 kWh at Home has no cost, so it is
-        # unknown rather than free and stays out of the average.
-        assert buckets["Home"]["avg_cost_per_kwh"] == 0.417
+        # 12.50 / 33 kWh drawn: Red Rocket's session at Home has no cost, so it
+        # is unknown rather than free and stays out of the average.
+        assert buckets["Home"]["avg_cost_per_kwh"] == 0.379
         assert buckets["Home"]["sessions_without_cost"] == 1
 
         blue_only = rows_from(
@@ -238,6 +240,7 @@ async def test_period_comparison_windows(mcp_session) -> None:
             "kwh_added",
             "charge_cost",
             "charge_sessions",
+            "charge_sessions_without_cost",
         }
         assert metrics["distance_km"]["current_value"] == 137.5  # 12.5 + 120 + 5
         assert metrics["distance_km"]["previous_value"] == 15.0  # 8 + 7, 45 days ago
@@ -248,6 +251,10 @@ async def test_period_comparison_windows(mcp_session) -> None:
         assert metrics["kwh_added"]["current_value"] == 100.0
         assert metrics["kwh_added"]["previous_value"] == 0.0
         assert metrics["kwh_added"]["change_pct"] is None
+        # No session in the previous window: its cost is unknown, not 0.
+        assert metrics["charge_cost"]["current_value"] == 42.5
+        assert metrics["charge_cost"]["previous_value"] is None
+        assert metrics["charge_sessions_without_cost"]["current_value"] == 1.0
 
 
 async def test_drive_route_downsamples(mcp_session) -> None:

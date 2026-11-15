@@ -10,8 +10,20 @@ WITH bounds AS (
 ),
 scope AS (
     SELECT c.id,
-        c.name
+        c.name,
+        last.drive_id AS last_drive_id,
+        last.date AS last_at
     FROM cars c
+        -- The car's newest polled position, to tell a drive in progress.
+        LEFT JOIN LATERAL (
+            SELECT p.drive_id,
+                p.date
+            FROM positions p
+            WHERE p.car_id = c.id
+                AND p.ideal_battery_range_km IS NOT NULL
+            ORDER BY p.date DESC
+            LIMIT 1
+        ) last ON true
     WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 samples AS (
@@ -36,6 +48,11 @@ samples AS (
                 pos.battery_level
             FROM positions pos
             WHERE pos.car_id = c.id
+                -- Polled rows only: TeslaMate's partial (car_id, date) index
+                -- finds the newest one directly, where the plain lookup has
+                -- no index to walk and scanned the car's history. A streamed
+                -- row may be the true last one, seconds to minutes later.
+                AND pos.ideal_battery_range_km IS NOT NULL
                 AND pos.date < b.start_at
             ORDER BY pos.date DESC
             LIMIT 1
@@ -61,9 +78,15 @@ gaps AS (
         NULL::integer AS battery_change
     FROM drives d
         JOIN scope c ON c.id = d.car_id
+    -- Open and silent for min_hours: an open record that is still logging is
+    -- a drive or charge in progress, not a hole. A drive is still logging
+    -- when the car's last position belongs to it.
     WHERE d.end_date IS NULL
         AND (now() AT TIME ZONE 'UTC') - d.start_date
             >= make_interval(hours => %(min_hours)s::int)
+        AND NOT COALESCE(c.last_drive_id = d.id
+            AND (now() AT TIME ZONE 'UTC') - c.last_at
+                < make_interval(hours => %(min_hours)s::int), FALSE)
     UNION ALL
     SELECT 'open_charge',
         c.name,
@@ -76,8 +99,9 @@ gaps AS (
     FROM charging_processes cp
         JOIN scope c ON c.id = cp.car_id
     WHERE cp.end_date IS NULL
-        AND (now() AT TIME ZONE 'UTC') - cp.start_date
-            >= make_interval(hours => %(min_hours)s::int)
+        AND (now() AT TIME ZONE 'UTC') - COALESCE((
+                SELECT MAX(ch.date) FROM charges ch WHERE ch.charging_process_id = cp.id
+            ), cp.start_date) >= make_interval(hours => %(min_hours)s::int)
     UNION ALL
     SELECT 'position_hole',
         c.name,

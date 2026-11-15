@@ -17,6 +17,6 @@ WHERE d.end_date IS NOT NULL
     AND (d.start_rated_range_km - d.end_rated_range_km) * c.efficiency * 1000 / d.distance
         BETWEEN 50 AND 600
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
-    AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+    AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
 ORDER BY d.start_date DESC
 LIMIT %(limit)s::int;

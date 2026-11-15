@@ -1,5 +1,5 @@
 name = "get_trip_details"
-description = "The timeline of one trip from get_trips: its drives (legs) and the stops between them in order, one row each. Drive rows carry drive_id (usable with get_drive_details / show_drive_route), times, distance, from/to place, max speed, and rated range used. Stop rows are kind 'stop' or 'charging_stop' with where and how long the car stood, and for charging stops the kWh added and battery % before and after. Use the same max_stop_minutes / max_charging_stop_minutes as the get_trips call the trip came from."
+description = "The timeline of one trip from get_trips: its drives (legs) and the stops between them in order, one row each. Drive rows carry drive_id (usable with get_drive_details / show_drive_route), times, distance, from/to place (the geofence name when there is one, else the address), max speed, and rated range used. Stop rows are kind 'stop' or 'charging_stop' with where and how long the car stood, and for charging stops the kWh added and battery % before and after. Use the same max_stop_minutes / max_charging_stop_minutes as the get_trips call the trip came from."
 
 [[params]]
 name = "trip_id"

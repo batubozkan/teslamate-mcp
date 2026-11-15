@@ -1,5 +1,5 @@
 name = "get_charging_costs"
-description = "Charging cost analysis grouped by local month, charging location, or car: session count, sessions with no recorded cost, total energy kWh, total cost (in the currency configured in TeslaMate), and average cost per kWh over the sessions that have a cost. Optional filters: car_name and a local-calendar date range. To fill in missing costs, see get_charging_cost_estimates."
+description = "Charging cost analysis grouped by local month, charging location, or car: session count, sessions with no recorded cost, total energy kWh, total cost (in the currency configured in TeslaMate; null when no session in the group has one), and average cost per kWh over the sessions that have a cost. The price is per kWh billed (the larger of kWh drawn from the charger and kWh added to the battery), so AC charging losses do not inflate it. Grouped by location, a place is the geofence when the session has one, else the address. A session is a finished charge that added energy. Optional filters: car_name and a local-calendar date range. To fill in missing costs, see get_charging_cost_estimates."
 
 [[params]]
 name = "group_by"

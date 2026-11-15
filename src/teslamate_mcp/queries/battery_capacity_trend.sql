@@ -15,7 +15,8 @@ FROM charging_processes cp
     JOIN cars c ON cp.car_id = c.id
 WHERE cp.end_battery_level - cp.start_battery_level >= %(min_soc_delta)s::int
     AND cp.charge_energy_added > 0
-    AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+    AND cp.start_date >= (date_trunc('month', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
+            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY TO_CHAR(DATE_TRUNC('month', (cp.start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s),
         'YYYY-MM'),

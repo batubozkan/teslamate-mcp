@@ -1,5 +1,5 @@
 name = "get_period_comparison"
-description = "Compare the last N days against the N days before them in one call: driving (distance km, drive count) and charging (kWh added, cost, session count) as one row per metric with current value, previous value, and percent change (null when the previous window is empty). Rolling windows anchored at the current instant, all cars combined unless filtered."
+description = "Compare the last N days against the N days before them in one call: driving (distance km, drive count) and charging (kWh added, cost, session count, sessions without a recorded cost) as one row per metric with current value, previous value, and percent change (null when the previous window is empty). Drives are finished drives; sessions are finished charges that added energy. A cost is null, not 0, when no session in the window has one. Rolling windows anchored at the current instant, all cars combined unless filtered."
 
 [[params]]
 name = "car_name"

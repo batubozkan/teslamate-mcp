@@ -18,13 +18,13 @@ SELECT c.name as car_name,
     p.rated_battery_range_km,
     p.ideal_battery_range_km,
     p.est_battery_range_km,
-    ROUND(
-        (
-            p.rated_battery_range_km / NULLIF(p.ideal_battery_range_km, 0) * 100
-        )::numeric,
-        2
-    ) as battery_health_pct,
+    -- Range at 100 %% now against the best the car has shown. The rated to
+    -- ideal range ratio this column used to hold is a constant of the car
+    -- model (100 on every car seen), so it said nothing about the battery.
+    ROUND(LEAST(100 * full_range.range_at_100_km / NULLIF(best_range.best_range_at_100_km, 0),
+        100)::numeric, 1) as battery_health_pct,
     full_range.range_at_100_km,
+    best_range.best_range_at_100_km,
     cap.capacity_kwh AS est_capacity_kwh,
     cap.sessions AS capacity_sessions,
     ROUND(totals.ac_kwh::numeric, 1) AS ac_energy_added_kwh,
@@ -58,6 +58,18 @@ FROM cars c
             LIMIT 5
         ) cp
     ) full_range
+    -- The best range at 100 %%: the 95th percentile of the same readings over
+    -- the car's whole history, so one lucky rounding does not set the bar.
+    CROSS JOIN LATERAL (
+        SELECT ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (
+                ORDER BY cp.end_rated_range_km * 100 / cp.end_battery_level)::numeric, 1)
+                AS best_range_at_100_km
+        FROM charging_processes cp
+        WHERE cp.car_id = c.id
+            AND cp.end_date IS NOT NULL
+            AND cp.end_battery_level >= 50
+            AND cp.end_rated_range_km > 0
+    ) best_range
     -- Usable capacity: the median energy added per battery percent over the
     -- newest ten charges that gained 40 points or more. The same energy per
     -- percent that get_battery_capacity_trend averages per month, with a

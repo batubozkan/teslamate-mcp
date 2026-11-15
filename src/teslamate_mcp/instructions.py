@@ -23,8 +23,18 @@ def build_instructions(settings: Settings) -> str:
         "in TeslaMate (miles, °F, psi).",
         "- Timestamps are UTC. Columns ending in _local, day and month buckets, and "
         f"date filters use the local time zone {settings.report_timezone}.",
+        "- A `days` filter reaches N x 24 hours back from now. Tools that bucket by "
+        "day, week, or month start at the beginning of the first bucket, so it is a "
+        "whole one.",
+        "- Drives are finished drives, and charging sessions are finished charges that "
+        "added energy; one in progress shows in `get_current_car_status` and "
+        "`get_timeline`.",
         "- Costs are in the currency the user set in TeslaMate. A session with no cost "
-        "is unknown, not free.",
+        "is unknown, not free: totals leave it out and are null when no session has a "
+        "cost, and sessions_without_cost counts what is missing. Prices per kWh are per "
+        "kWh billed (drawn from the charger), not per kWh added to the battery.",
+        "- A place is named by its TeslaMate geofence when it has one, else by its "
+        "address; location filters match both.",
         "- car_name filters by case-insensitive substring; leave it out for all cars "
         "and say which car each number belongs to.",
         "",

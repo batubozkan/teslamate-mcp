@@ -1,5 +1,5 @@
 name = "get_unusual_power_consumption"
-description = "Lists individual drives whose rated-range consumption exceeds threshold_pct (range used as a percent of distance driven, default 150), with car name, date, distance (km), range used (km), consumption percentage, outside temperature (°C), and start/end locations. Returns the top 10 by consumption by default. Optional filters: car_name, days, threshold_pct, limit."
+description = "Lists individual drives whose rated-range consumption exceeds threshold_pct (range used as a percent of distance driven, default 150), with car name, date, distance (km), range used (km), consumption percentage, outside temperature (°C), and start/end locations (the geofence name where the drive has one). Drives under min_distance_km (default 5) are left out: over a short distance the range figures are rounding noise. Returns the top 10 by consumption by default. Optional filters: car_name, days, threshold_pct, min_distance_km, limit."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[params]]
@@ -18,6 +18,14 @@ type = "number"
 description = "Flag drives whose range consumption exceeds this percent of distance driven."
 default = 150
 minimum = 100
+maximum = 1000
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only drives at least this long, in km. Lower it to include short drives."
+default = 5
+minimum = 0
 maximum = 1000
 
 [[params]]

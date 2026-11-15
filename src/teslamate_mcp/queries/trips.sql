@@ -12,6 +12,8 @@ WITH scope AS (
         d.end_rated_range_km,
         d.start_address_id,
         d.end_address_id,
+        d.start_geofence_id,
+        d.end_geofence_id,
         d.ascent,
         d.descent
     FROM drives d
@@ -105,7 +107,10 @@ summary AS (
             AS outside_temp_avg,
         (ARRAY_AGG(t.start_address_id ORDER BY t.start_date))[1] AS start_address_id,
         (ARRAY_AGG(t.end_address_id ORDER BY t.start_date DESC))[1] AS end_address_id,
-        ARRAY_AGG(t.start_address_id) || ARRAY_AGG(t.end_address_id) AS address_ids
+        ARRAY_AGG(t.start_address_id) || ARRAY_AGG(t.end_address_id) AS address_ids,
+        (ARRAY_AGG(t.start_geofence_id ORDER BY t.start_date))[1] AS start_geofence_id,
+        (ARRAY_AGG(t.end_geofence_id ORDER BY t.start_date DESC))[1] AS end_geofence_id,
+        ARRAY_AGG(t.start_geofence_id) || ARRAY_AGG(t.end_geofence_id) AS geofence_ids
     FROM tripped t
     GROUP BY t.car_id, t.trip_id
 ),
@@ -126,6 +131,11 @@ filtered AS (
             WHERE a.id = ANY (s.address_ids)
                 AND (a.display_name ILIKE '%%' || %(location)s || '%%'
                     OR a.city ILIKE '%%' || %(location)s || '%%')
+        ) OR EXISTS (
+            SELECT 1
+            FROM geofences g
+            WHERE g.id = ANY (s.geofence_ids)
+                AND g.name ILIKE '%%' || %(location)s || '%%'
         ))
     ORDER BY CASE
             WHEN %(order_by)s::text = 'distance' THEN s.distance_km
@@ -147,9 +157,9 @@ SELECT f.trip_id,
     ROUND(f.stopped_min::numeric) AS stopped_min,
     ROUND((f.distance_km / NULLIF(f.driving_min, 0) * 60)::numeric, 1) AS avg_moving_speed_kmh,
     f.speed_max_kmh,
-    sa.display_name AS start_location,
+    COALESCE(sg.name, sa.display_name) AS start_location,
     sa.city AS start_city,
-    ea.display_name AS end_location,
+    COALESCE(eg.name, ea.display_name) AS end_location,
     ea.city AS end_city,
     first_pos.battery_level AS start_battery_level,
     last_pos.battery_level AS end_battery_level,
@@ -161,6 +171,8 @@ SELECT f.trip_id,
 FROM filtered f
     LEFT JOIN addresses sa ON sa.id = f.start_address_id
     LEFT JOIN addresses ea ON ea.id = f.end_address_id
+    LEFT JOIN geofences sg ON sg.id = f.start_geofence_id
+    LEFT JOIN geofences eg ON eg.id = f.end_geofence_id
     LEFT JOIN LATERAL (
         SELECT p.battery_level
         FROM positions p

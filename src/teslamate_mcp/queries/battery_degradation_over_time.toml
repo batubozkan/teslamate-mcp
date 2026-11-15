@@ -1,5 +1,5 @@
 name = "get_battery_degradation_over_time"
-description = "Per-car battery degradation: monthly average and maximum rated range (km) from positions logged at 100% battery, with data-point counts, over the last 730 days by default (months bucketed in the report timezone). Optional filters: car_name, days."
+description = "Per-car battery degradation: monthly average and maximum rated range (km) from positions logged at 100% battery, with data-point counts, over the last 730 days by default (months bucketed in the report timezone; the window starts with the month that `days` ago falls in, so the first month is a whole one). Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"

@@ -1,6 +1,7 @@
 -- What driving costs per local month: the distance driven against the charging
 -- that month, split into AC and DC. A session is DC when a charge sample came
--- from a fast charger, as in get_charging_efficiency. Prices per kWh only count
+-- from a fast charger, as in get_charging_efficiency. Prices per kWh are over
+-- billed energy (the larger of kWh drawn and kWh added) and only count
 -- sessions with a recorded cost, so a month with unpriced sessions still shows
 -- a fair price; cost_per_100km uses the recorded cost and undercounts then.
 WITH scope_cars AS (
@@ -15,13 +16,15 @@ driving AS (
     FROM drives d
     WHERE d.car_id IN (SELECT id FROM scope_cars)
         AND d.end_date IS NOT NULL
-        AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND d.start_date >= (date_trunc('month', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
+            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
     GROUP BY 1, 2
 ),
 sessions AS (
     SELECT cp.car_id,
         DATE_TRUNC('month', (cp.start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text) AS month,
         cp.charge_energy_added AS kwh,
+        GREATEST(cp.charge_energy_used, cp.charge_energy_added) AS billed_kwh,
         cp.cost,
         EXISTS (
             SELECT 1
@@ -33,7 +36,8 @@ sessions AS (
     WHERE cp.car_id IN (SELECT id FROM scope_cars)
         AND cp.end_date IS NOT NULL
         AND cp.charge_energy_added > 0
-        AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND cp.start_date >= (date_trunc('month', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
+            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
 ),
 charging AS (
     SELECT car_id,
@@ -44,11 +48,11 @@ charging AS (
         SUM(kwh) FILTER (WHERE NOT is_dc) AS ac_kwh,
         SUM(kwh) FILTER (WHERE is_dc) AS dc_kwh,
         SUM(cost) AS cost,
-        SUM(cost) FILTER (WHERE NOT is_dc) / NULLIF(SUM(kwh) FILTER (WHERE NOT is_dc AND cost IS NOT NULL), 0)
+        SUM(cost) FILTER (WHERE NOT is_dc) / NULLIF(SUM(billed_kwh) FILTER (WHERE NOT is_dc AND cost IS NOT NULL), 0)
             AS ac_price,
-        SUM(cost) FILTER (WHERE is_dc) / NULLIF(SUM(kwh) FILTER (WHERE is_dc AND cost IS NOT NULL), 0)
+        SUM(cost) FILTER (WHERE is_dc) / NULLIF(SUM(billed_kwh) FILTER (WHERE is_dc AND cost IS NOT NULL), 0)
             AS dc_price,
-        SUM(cost) / NULLIF(SUM(kwh) FILTER (WHERE cost IS NOT NULL), 0) AS price
+        SUM(cost) / NULLIF(SUM(billed_kwh) FILTER (WHERE cost IS NOT NULL), 0) AS price
     FROM sessions
     GROUP BY car_id, month
 )

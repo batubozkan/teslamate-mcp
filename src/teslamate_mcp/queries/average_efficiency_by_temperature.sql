@@ -13,11 +13,12 @@ SELECT c.name as car_name,
     ) as avg_consumption_pct
 FROM drives d
     JOIN cars c ON d.car_id = c.id
-WHERE d.distance > 0
+WHERE d.end_date IS NOT NULL -- a drive still open is not a drive yet
+    AND d.distance > 0
     AND d.start_rated_range_km > d.end_rated_range_km
     AND d.outside_temp_avg IS NOT NULL
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
-    AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+    AND (%(days)s::int IS NULL OR d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
 GROUP BY c.name,
     CASE
         WHEN d.outside_temp_avg < 0 THEN 'Below 0°C'

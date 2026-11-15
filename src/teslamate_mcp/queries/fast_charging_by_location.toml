@@ -1,5 +1,5 @@
 name = "get_fast_charging_by_location"
-description = "DC fast-charging per location and charger type (supercharger or other_dc): how often you charged there, average and best peak power kW, average power over the session and across 20-80% (the fairest speed comparison), average minutes from 20% to 80%, kWh added, average price per kWh over sessions with a cost, sessions where the battery heater ran, and the last visit. Answers 'which fast chargers are fastest (or cheapest) for my car?'. Most-used first by default. Sessions that added under 1 kWh are skipped."
+description = "DC fast-charging per location and charger type (supercharger or other_dc): how often you charged there, average and best peak power kW, average power over the session and across 20-80% (the fairest speed comparison), average minutes from 20% to 80%, kWh added, average price per kWh billed (the larger of kWh drawn and kWh added) over sessions with a cost, sessions where the battery heater ran, and the last visit. Answers 'which fast chargers are fastest (or cheapest) for my car?'. Most-used first by default. Sessions that added under 1 kWh are skipped."
 
 [[params]]
 name = "car_name"

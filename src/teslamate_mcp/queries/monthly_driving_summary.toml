@@ -1,5 +1,5 @@
 name = "get_monthly_driving_summary"
-description = "Per-car monthly driving summary: trip count, total and average distance (km), total driving time (minutes), average outside temperature (°C), and max speed, bucketed by calendar month in the report timezone. Covers all time by default. Optional filters: car_name, days."
+description = "Per-car monthly driving summary: trip count, total and average distance (km), total driving time (minutes), average outside temperature (°C), and max speed, bucketed by calendar month in the report timezone. Covers all time by default; with `days`, the window starts with the month that many days ago falls in, so the first month is a whole one. Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[output]]

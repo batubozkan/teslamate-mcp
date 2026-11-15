@@ -1,5 +1,5 @@
 name = "get_charging_by_location"
-description = "Charging statistics by location for the whole fleet: session count, total and average energy added (kWh), total charging time (minutes), and total cost, ordered by most sessions. Returns all locations over all time by default. Optional filters: car_name, days, limit."
+description = "Charging statistics by location for the whole fleet: session count, total and average energy added (kWh), total charging time (minutes), total cost, and the sessions with no recorded cost, ordered by most sessions. A location is the TeslaMate geofence when the session has one (one row for the whole geofence), else the address. A session is a finished charge that added energy. The total cost is null, not 0, when no session there has a cost. Returns all locations over all time by default. Optional filters: car_name, days, limit."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[params]]
@@ -45,3 +45,8 @@ type = "integer"
 [[output]]
 name = "total_cost"
 type = "number"
+
+[[output]]
+name = "sessions_without_cost"
+type = "integer"
+description = "Sessions with no recorded cost; the cost leaves them out."

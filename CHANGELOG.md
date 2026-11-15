@@ -4,6 +4,132 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+The tools now share one meaning for "last N days", for what a drive and a
+charging session are, for a cost nobody recorded, and for the name of a place.
+Several numbers change with that; the first section says which and why.
+
+### Changed: what the numbers mean
+- **"Last N days" is the last N × 24 hours, in every tool.** Most tools cut
+  the window at midnight of the database session's time zone and compared it
+  with UTC timestamps, so the same `days` reached a different distance back
+  depending on the tool and the time of day. Tools that bucket by month
+  (`get_monthly_driving_summary`, `get_odometer_history`,
+  `get_efficiency_by_month_and_temperature`, `get_battery_degradation_over_time`,
+  `get_battery_capacity_trend`, `get_cost_per_distance`, `get_driving_style`),
+  by day (`get_drive_summary_per_day`, `get_daily_battery_usage_patterns`) or
+  by week (`get_tire_pressure_weekly_trends`) now start at the beginning of
+  the first bucket in `REPORT_TIMEZONE`. Their first month, day or week used
+  to be cut off and shown as if it were whole, so its totals grow.
+- **A charging session is a finished charge that added energy; a drive is a
+  finished drive.** Plug-ins that added nothing and records still open are no
+  longer counted or listed by the summary, cost, location, search, recap and
+  comparison tools (`get_all_charging_sessions_summary`, `get_charging_costs`,
+  `get_charging_by_location`, `get_charging_by_geofence`,
+  `get_charging_efficiency`, `get_fuel_savings`, `get_regions_visited`,
+  `get_visited_places`, `get_period_comparison`, `get_recap`,
+  `get_activity_report`, `search_charging_sessions`, `search_drives`,
+  `get_daily_driving_patterns`, `get_drive_summary_per_day`,
+  `get_average_efficiency_by_temperature`, `get_most_visited_locations`,
+  `get_efficiency_by_month_and_temperature`, `get_unusual_power_consumption`).
+  Session counts drop by the number of empty plug-ins, averages per session
+  rise accordingly, and a charger where several attempts failed loses those
+  attempts: the recap's most used charging location can change. A drive or
+  charge in progress still shows in `get_current_car_status` and
+  `get_timeline`.
+- **A cost nobody recorded is unknown, not 0.** `get_all_charging_sessions_summary`,
+  `get_charging_by_location`, `get_charging_costs` and `get_period_comparison`
+  returned 0 for a period without any recorded cost; they now return null,
+  like the other tools, and say how many sessions have no cost
+  (`sessions_without_cost`; in `get_period_comparison` the new metric
+  `charge_sessions_without_cost`). `get_recap` and `get_activity_report` gained
+  the same count.
+- **A price per kWh is per kWh billed**: the cost over the larger of the kWh
+  drawn from the charger and the kWh added to the battery, in
+  `get_charging_costs`, `get_charging_by_geofence`, `get_cost_per_distance` and
+  `get_fast_charging_by_location`, as `get_fuel_savings` and
+  `get_climate_usage` already did. Dividing by the kWh added overstated the
+  price by the charging loss, so AC prices come out 5-10 % lower and DC prices
+  a few percent lower.
+- **A place is its TeslaMate geofence when it has one, else its address.**
+  `get_visited_places` (and the `show_visited_places` map),
+  `get_most_visited_locations`, `get_charging_by_location` and
+  `get_charging_costs` grouped by location return one row per geofence; one
+  geofence used to show as a row for every address reverse geocoding gave it.
+  The map draws a geofence at its center. The `location` filter of
+  `search_charging_sessions`, `search_drives` and `get_trips` matches geofence
+  names too (searching for "Home" found nothing before), and these tools,
+  `get_trip_details`, `get_longest_drives_by_distance`,
+  `get_unusual_power_consumption`, `get_vampire_drain` and
+  `get_idle_awake_periods` show the geofence name where there is one.
+- **`battery_health_pct` in `get_battery_health_summary` is the range at 100 %
+  now against the best the car has shown** (the new `best_range_at_100_km`,
+  the 95th percentile of the range at 100 % over all charges that ended at
+  50 % or more). It was the rated to ideal range ratio, a constant of the car
+  model that read exactly 100 on every car.
+- **`get_unusual_power_consumption` leaves out drives under 5 km**
+  (`min_distance_km`, 0 brings them back). Over a few hundred meters the range
+  figures are rounding noise, and those drives filled the whole list.
+- **`get_charging_curve_comparison` and its chart return every session named
+  in `charging_process_ids`, up to 10.** Naming seven returned the newest five
+  without saying so; `limit` now only caps the sessions the filters pick.
+
+### Added
+- `wh_per_km` in `get_efficiency_by_month_and_temperature` and
+  `get_total_distance_and_efficiency`: rated range used times the car's
+  efficiency, over the distance driven, as in `get_recap`. Both tools were
+  named for efficiency and had no efficiency column.
+- `range_at` in `get_current_car_status`: when the range, outside temperature
+  and climate state were read.
+
+### Fixed
+- `get_current_car_status` returned null for the rated range, the outside
+  temperature and the climate state whenever the newest logged row was a
+  streamed one: during a drive, and permanently for a car whose last row was
+  one. They now come from the car's last full reading. The newest-row lookup
+  had no index to use and took over a second per car on a database with
+  millions of positions; the call now takes about a tenth of a second.
+- A charging session TeslaMate never closed counted as still running, so it
+  overlapped every later parking gap: `get_vampire_drain` and the
+  `parked_drain` health check returned nothing from that day on. Such a
+  session now ends at its last charge sample.
+- `get_health_checks` reported a charge as lost (`open_records`) once it had
+  run for 6 hours, which a long AC charge does. A drive or charge with no end
+  is now lost when it has logged nothing for 6 hours; `get_logging_gaps` lists
+  open records by the same rule.
+- `show_trip_replay`: dragging the timeline to the end while playing started
+  the trip over. It now stops at the end and shows the summary, as do the End
+  and → keys when paused.
+- `show_battery_degradation` and `show_charging_curve_comparison` dropped the
+  filters from the subtitle once the data arrived; they keep them.
+- `show_charging_curve_comparison` repeated its six colours from the seventh
+  session on. Sessions 7 to 10 are drawn dashed (line, legend and tooltip).
+- The `show_battery_degradation` description promised a "best range" line;
+  the chart draws the monthly average, and the best range is in the table.
+- Chart and map views, the replay included, could not shrink again after
+  their data table was closed or a shorter result arrived, because they
+  reported the height of the frame they were in.
+
+### Performance
+- `show_trip_replay` no longer rebuilds the whole driven line on every frame,
+  so long trips play more smoothly, most at 2× and 4×.
+- Chart and map views redraw once per result and only when their width
+  changes; they used to redraw on every change of their own height.
+- `get_logging_gaps` finds the last position before its window through
+  TeslaMate's partial index instead of walking the car's history.
+- `search_drives` compares only the drives it returns with the car's usual
+  consumption, not every drive the filters matched.
+- `get_driven_roads` reads the positions once: the sampling step comes from
+  the drives' position ids instead of a count over the same rows.
+
+### Packaging and docs
+- The Docker image no longer installs a compiler, the Python headers or libpq
+  (`psycopg[binary]` brings its own), and pins the uv version it is built with.
+- The unused `cli` extra of the `mcp` dependency is dropped.
+- The Unraid guide said the GHCR image was private; it is public, as the
+  README assumed.
+- Unused styles removed from the `show_driven_roads` and
+  `show_visited_places` views, and unused columns from two queries.
+
 ## [0.18.5] - 2026-11-15
 
 ### Fixed

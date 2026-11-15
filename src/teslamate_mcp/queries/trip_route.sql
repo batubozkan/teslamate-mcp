@@ -1,19 +1,10 @@
 WITH scope AS (
     SELECT d.id AS drive_id,
         d.car_id,
-        c.name AS car_name,
         d.start_date,
         d.end_date,
-        d.distance,
-        d.duration_min,
-        d.speed_max,
-        d.outside_temp_avg,
-        d.start_rated_range_km,
-        d.end_rated_range_km,
-        d.start_address_id,
         d.end_address_id
     FROM drives d
-        JOIN cars c ON c.id = d.car_id
     WHERE d.end_date IS NOT NULL
         AND d.car_id = (SELECT car_id FROM drives WHERE id = %(trip_id)s::int)
 ),

@@ -176,7 +176,7 @@ window.addEventListener("message", (event) => {
   if (msg.method === "ui/notifications/host-context-changed") {
     const p = msg.params || {};
     if (p.theme) applyTheme(p.theme);
-    if (p.theme || p.containerDimensions) render();
+    if (p.theme) render(); else if (p.containerDimensions) onResize();
     return;
   }
   if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
@@ -427,8 +427,17 @@ function isDark() {
   return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 }
 
+// Only a new width changes the drawing. The view's height changes with every
+// render and table toggle, and redrawing for those would do the work twice.
+let drawnWidth = -1;
+function rootWidth() { return document.getElementById("root").clientWidth; }
+function onResize() {
+  if (rootWidth() !== drawnWidth && points.length) render(); else reportSize();
+}
+
 function render() {
   if (!points.length || glMode === "pending") { reportSize(); return; }
+  drawnWidth = rootWidth();
   const width = Math.max(280, document.getElementById("chartWrap").clientWidth || 280);
   if (glMode === "on" && !renderGlMap()) glMode = "off";
   if (glMode === "off") renderSvgMap(width);
@@ -813,17 +822,19 @@ function hideHover() {
 
 /* ---------- sizing ---------- */
 let sizeRaf = 0;
+// The root's own height, not the document's scrollHeight: that is never less
+// than the frame, so a host that sizes the frame from this report could not
+// shrink the view again after a closed table or a shorter result.
 function reportSize() {
   cancelAnimationFrame(sizeRaf);
   sizeRaf = requestAnimationFrame(() => {
     notify("ui/notifications/size-changed", {
       width: document.documentElement.scrollWidth,
-      height: document.documentElement.scrollHeight,
+      height: Math.ceil(document.getElementById("root").getBoundingClientRect().height),
     });
   });
 }
-new ResizeObserver(() => { if (points.length) render(); else reportSize(); })
-  .observe(document.getElementById("root"));
+new ResizeObserver(onResize).observe(document.getElementById("root"));
 if (window.matchMedia) {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render());
 }

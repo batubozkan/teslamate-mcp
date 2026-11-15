@@ -11,12 +11,14 @@ visits AS (
     FROM drives d
     WHERE d.car_id IN (SELECT id FROM scope_cars)
         AND d.end_date IS NOT NULL
-        AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+        AND (%(days)s::int IS NULL OR d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
     UNION ALL
     SELECT cp.address_id, cp.start_date, 'charge'
     FROM charging_processes cp
     WHERE cp.car_id IN (SELECT id FROM scope_cars)
-        AND (%(days)s::int IS NULL OR cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+        AND cp.end_date IS NOT NULL
+        AND cp.charge_energy_added > 0
+        AND (%(days)s::int IS NULL OR cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
 ),
 located AS (
     SELECT a.country,

@@ -1,5 +1,5 @@
 name = "get_idle_awake_periods"
-description = "When and where the car stayed awake while parked: online periods from TeslaMate's state log, minus the time spent driving and charging inside them, longest idle time first. Each row has the period's start (UTC and local), end (null while still ongoing), online hours, idle awake hours, drives during it, whether it charged, and where the car was parked. Long idle periods usually come from Sentry Mode, cabin overheat protection, climate kept on, a third-party app polling the car, or a TeslaMate setting that stops it from sleeping. Pair with get_state_history for the daily view."
+description = "When and where the car stayed awake while parked: online periods from TeslaMate's state log, minus the time spent driving and charging inside them, longest idle time first. Each row has the period's start (UTC and local), end (null while still ongoing), online hours, idle awake hours, drives during it, whether it charged, and where the car was parked (the geofence name when it parked in one, else the address). Long idle periods usually come from Sentry Mode, cabin overheat protection, climate kept on, a third-party app polling the car, or a TeslaMate setting that stops it from sleeping. Pair with get_state_history for the daily view."
 
 [[params]]
 name = "car_name"

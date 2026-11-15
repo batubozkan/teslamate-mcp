@@ -178,6 +178,30 @@ def test_inlined_map_files_cannot_close_their_tag() -> None:
         assert "</style" not in _load_app_file(*path).lower(), path
 
 
+def test_views_redraw_for_width_and_report_their_own_height() -> None:
+    """A view's height changes with every render, so an observer that redraws on
+    any size change draws each result twice; and the document's scrollHeight is
+    never less than the frame, so reporting it would keep a host from shrinking
+    the view. The replay sizes its stage itself and is not covered here."""
+    for spec in APP_SPECS:
+        if spec.tool_name == "show_trip_replay":
+            continue
+        html = _load_app_html(spec.html_file)
+        assert "document.documentElement.scrollHeight" not in html, spec.tool_name
+        assert "containerDimensions) render()" not in html, spec.tool_name
+        if spec.tool_name != "show_recap":  # the recap is laid out in CSS alone
+            assert "new ResizeObserver(onResize)" in html, spec.tool_name
+            assert "rootWidth() !== drawnWidth" in html, spec.tool_name
+
+
+def test_comparison_view_tells_ten_sessions_apart() -> None:
+    """Six colors, then the same six dashed: line, legend key, and tooltip key."""
+    html = _load_app_html("charging_curve_comparison.html")
+    assert "dashed: i % 12 >= 6" in html
+    assert ".series-line.dashed { stroke-dasharray" in html
+    assert ".legend .key.dashed, .tooltip .key.dashed { border-top-style: dashed; }" in html
+
+
 def test_missing_curve_query_fails_fast() -> None:
     with pytest.raises(RuntimeError, match="get_charging_curve"):
         build_apps_extension([], report_timezone="UTC")

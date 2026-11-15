@@ -1,5 +1,5 @@
 name = "get_visited_places"
-description = "Where the car parks: one row per place it arrived at (a drive ending there), with the place's coordinates, the number of arrivals, hours parked there (until the car's next drive; the current stay counts up to now), charging sessions and kWh added there, and the last arrival. Geofence names win over addresses; one place can show up as several nearby addresses (reverse geocoding varies by a few meters), which a TeslaMate geofence merges. Most-visited first. Prefer show_visited_places when the user wants to see the places on a map."
+description = "Where the car parks: one row per place it arrived at (a drive ending there), with the place's coordinates, the number of arrivals, hours parked there (until the car's next drive; the current stay counts up to now), charging sessions and kWh added there, and the last arrival. A place is the TeslaMate geofence when the arrival has one (one row for the whole geofence, at its center), else the address; without a geofence one place can show up as several nearby addresses (reverse geocoding varies by a few meters). Most-visited first. Prefer show_visited_places when the user wants to see the places on a map."
 
 [[params]]
 name = "car_name"

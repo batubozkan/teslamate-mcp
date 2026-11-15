@@ -1,5 +1,5 @@
 name = "get_efficiency_by_month_and_temperature"
-description = "Returns per-car monthly driving stats bucketed by local calendar month over the last 365 days by default: average outside temperature (°C), total distance (km), drive count, and average distance per drive (km). Optional filters: car_name, days."
+description = "Returns per-car monthly driving stats bucketed by local calendar month over the last 365 days by default: average outside temperature (°C), total distance (km), drive count, average distance per drive (km), and consumption (wh_per_km: rated range used times the car's efficiency, over the distance driven). The window starts with the month that `days` ago falls in, so the first month is a whole one. Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"
@@ -36,3 +36,8 @@ type = "integer"
 [[output]]
 name = "avg_distance_per_drive"
 type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Consumption in Wh/km on the rated-range scale."

@@ -56,7 +56,9 @@ picked AS (
                 OR %(charger_type)s::text = t.charger_type
                 OR (%(charger_type)s::text = 'dc' AND t.charger_type <> 'ac')))
     ORDER BY t.start_date DESC
-    LIMIT %(limit)s::int
+    -- Named sessions are all returned, up to the most the chart can tell
+    -- apart; `limit` only caps the sessions the filters pick.
+    LIMIT CASE WHEN %(charging_process_ids)s::text IS NOT NULL THEN 10 ELSE %(limit)s::int END
 )
 SELECT p.id AS charging_process_id,
     p.car_name,

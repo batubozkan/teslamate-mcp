@@ -5,7 +5,8 @@ SELECT c.name as car_name,
     MAX(p.battery_level) - MIN(p.battery_level) as daily_usage
 FROM positions p
     JOIN cars c ON p.car_id = c.id
-WHERE p.date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+WHERE p.date >= (date_trunc('day', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
+            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.id,
     c.name,

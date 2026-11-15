@@ -6,14 +6,13 @@ ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pinned so a rebuild of the same commit gives the same image.
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc python3-dev libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# No compiler and no libpq: every locked dependency ships a wheel for this
+# Python on amd64 and arm64, and psycopg[binary] carries its own libpq.
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 
@@ -30,10 +29,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 1000 mcp
+RUN useradd --create-home --uid 1000 mcp
 
 WORKDIR /app
 COPY --from=builder --chown=mcp:mcp /app/.venv /app/.venv

@@ -1,5 +1,5 @@
 name = "get_total_distance_and_efficiency"
-description = "Per-car driving totals: drive count, total and average distance (km), average outside temperature (°C), and average max speed. Covers all time by default. Optional filters: car_name, days."
+description = "Per-car driving totals: drive count, total and average distance (km), average outside temperature (°C), average max speed, and consumption (wh_per_km: rated range used times the car's efficiency, over the distance driven). Covers all time by default. Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[output]]
@@ -35,3 +35,8 @@ type = "number"
 [[output]]
 name = "avg_max_speed"
 type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Consumption in Wh/km on the rated-range scale."

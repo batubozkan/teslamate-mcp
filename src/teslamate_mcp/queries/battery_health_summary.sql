@@ -1,4 +1,10 @@
--- Latest position per car via a LATERAL top-1.
+-- Latest position with range data per car via a LATERAL top-1.
+--
+-- Rows streamed while driving carry no range or usable battery level, so the
+-- plain latest row often read null in every range column (and for a car whose
+-- last logged row was a streamed one, always). TeslaMate fills them on polled
+-- rows only; the ideal-range test picks those and lets the lookup use its
+-- partial (car_id, date) index.
 --
 -- The previous form filtered with
 --   WHERE p.date = (SELECT MAX(date) FROM positions p2 WHERE p2.car_id = p.car_id)
@@ -26,13 +32,15 @@ SELECT c.name as car_name,
     ROUND(((totals.ac_kwh + totals.dc_kwh) / NULLIF(cap.capacity_kwh, 0))::numeric, 1)
         AS charge_cycles
 FROM cars c
-    CROSS JOIN LATERAL (
+    -- LEFT: a car with no such row still gets its charging-based columns.
+    LEFT JOIN LATERAL (
         SELECT *
         FROM positions p
         WHERE p.car_id = c.id
+            AND p.ideal_battery_range_km IS NOT NULL
         ORDER BY p.date DESC
         LIMIT 1
-    ) p
+    ) p ON true
     -- Range at 100 %% from the newest charges that ended at 50 %% or more:
     -- scaling a low battery level up to 100 %% magnifies its rounding.
     CROSS JOIN LATERAL (
@@ -51,8 +59,9 @@ FROM cars c
         ) cp
     ) full_range
     -- Usable capacity: the median energy added per battery percent over the
-    -- newest ten charges that gained 40 points or more, the same estimate
-    -- get_battery_capacity_trend makes per month.
+    -- newest ten charges that gained 40 points or more. The same energy per
+    -- percent that get_battery_capacity_trend averages per month, with a
+    -- stricter gain and a median.
     CROSS JOIN LATERAL (
         SELECT ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (
                 ORDER BY cp.charge_energy_added * 100

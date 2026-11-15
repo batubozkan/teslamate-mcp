@@ -8,7 +8,6 @@ from teslamate_mcp.config import Settings
 from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.apps_ui import (
     APP_SPECS,
-    CHARGING_CURVE_APP_URI,
     MAP_CSP,
     MAP_STYLE_HOST,
     MAP_TILE_HOST,
@@ -188,7 +187,6 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
     async with mcp_session() as session:
         resources = await session.list_resources()
         uris = {str(r.uri): r for r in resources.resources}
-        assert CHARGING_CURVE_APP_URI in uris
         for spec in APP_SPECS:
             assert spec.uri in uris, spec.tool_name
             assert uris[spec.uri].mime_type == "text/html;profile=mcp-app"

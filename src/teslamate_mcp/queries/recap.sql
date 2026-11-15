@@ -8,8 +8,6 @@ WITH today AS (
 bounds AS (
     SELECT f.first_day,
         (f.first_day + f.step)::date AS end_day,
-        (f.first_day - f.step)::date AS prev_day,
-        f.step,
         (f.first_day::timestamp AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC' AS start_utc,
         ((f.first_day + f.step)::timestamp AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
             AS end_utc,

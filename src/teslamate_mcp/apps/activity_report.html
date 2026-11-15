@@ -68,9 +68,6 @@
   .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
   .stat .v { font-size: 15px; font-weight: 600; }
   .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
-  .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
-  .legend .key { width: 12px; height: 0; border-top: 2.5px solid; flex: none; }
   .chart-wrap { position: relative; margin-top: 6px; }
   svg { display: block; width: 100%; }
   svg:focus { outline: 1.5px solid var(--series-1); outline-offset: 2px; border-radius: 2px; }
@@ -79,8 +76,6 @@
   .grid-line { stroke: var(--grid); stroke-width: 1; }
   .base-line { stroke: var(--baseline); stroke-width: 1; }
   .series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
-  .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
   .tooltip {
     position: absolute; top: 0; left: 0; pointer-events: none; display: none;
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
@@ -100,7 +95,6 @@
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--text-muted); font-weight: 600; }
   .bar { opacity: 0.85; }
-  .bar-hover { opacity: 1; }
   .series-dot { stroke: var(--surface-1); stroke-width: 1.5; }
 </style>
 </head>
@@ -230,6 +224,9 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result).filter((r) => typeof r.bucket === "string");
+  // A hover belongs to the rows it was made on: drop the index and its tooltip.
+  hoverIndex = -1;
+  document.getElementById("tooltip").style.display = "none";
   if (!rows.length) {
     showState("Nothing to report for this period.");
     return;

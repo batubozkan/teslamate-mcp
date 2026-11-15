@@ -29,7 +29,7 @@
   <DonateLink/>
   <Requires>TeslaMate and its PostgreSQL database must already be running.</Requires>
   <Config Name="MCP HTTP port" Target="8888" Default="8888" Mode="tcp"
-          Description="Streamable HTTP MCP endpoint (/mcp) and liveness probe (/health)."
+          Description="Streamable HTTP MCP endpoint (/mcp) and health probe (/health, checks the database)."
           Type="Port" Display="always" Required="true" Mask="false">8888</Config>
   <Config Name="DATABASE_URL" Target="DATABASE_URL"
           Default="postgresql://teslamate_ro:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
@@ -44,12 +44,21 @@
   <Config Name="CF_ACCESS_AUD" Target="CF_ACCESS_AUD" Default="" Mode=""
           Description="Optional. Application Audience (AUD) tag of the Cloudflare Access application protecting the direct hostname. Set together with CF_ACCESS_TEAM_DOMAIN."
           Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="REPORT_TIMEZONE" Target="REPORT_TIMEZONE" Default="UTC" Mode=""
+          Description="IANA timezone (e.g. Europe/Istanbul) for the daily, weekly, and monthly buckets and the date filters of the reports."
+          Type="Variable" Display="always" Required="false" Mask="false">UTC</Config>
+  <Config Name="ENABLE_CHARGING_WRITES" Target="ENABLE_CHARGING_WRITES" Default="false" Mode=""
+          Description="Register the set_charging_cost write tool. Needs GRANT UPDATE (cost) ON charging_processes for the DATABASE_URL role."
+          Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
   <Config Name="MAP_TILES" Target="MAP_TILES" Default="true" Mode=""
           Description="Draw an interactive basemap (CARTO vector tiles; Esri raster tiles where the client cannot run it) under the route, trip, places, and roads maps. Tiles are fetched by the viewer's browser and reveal the rough area viewed; set false to keep the maps fully offline."
           Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="INFO" Mode=""
           Description="Python log level (DEBUG, INFO, WARNING, ERROR)."
           Type="Variable" Display="advanced" Required="false" Mask="false">INFO</Config>
+  <Config Name="STATEMENT_TIMEOUT_MS" Target="STATEMENT_TIMEOUT_MS" Default="30000" Mode=""
+          Description="statement_timeout (ms) bounding every query, including the bundled reports."
+          Type="Variable" Display="advanced" Required="false" Mask="false">30000</Config>
   <Config Name="QUERY_TIMEOUT_MS" Target="QUERY_TIMEOUT_MS" Default="5000" Mode=""
           Description="statement_timeout (ms) applied to run_sql custom queries."
           Type="Variable" Display="advanced" Required="false" Mask="false">5000</Config>

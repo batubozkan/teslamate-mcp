@@ -355,3 +355,58 @@ async def test_run_sql_row_cap_holds_against_its_own_limit(mcp_session) -> None:
     assert [r["id"] for r in under] == [1, 2]
     assert rejected.is_error
     assert "at most 25 rows" in tools["run_sql"].description
+
+
+async def test_open_drive_is_not_a_drive_yet(mcp_session) -> None:
+    """Regression: a drive with no end has no distance, and NULLs sort first under
+    DESC, so it led get_longest_drives_by_distance and was counted in the totals.
+    The medic seed has two finished drives and one left open."""
+    async with mcp_session(seeds=["medic"]) as session:
+        longest = rows_from(
+            await session.call_tool("get_longest_drives_by_distance", {"car_name": "medic"})
+        )
+        total = rows_from(
+            await session.call_tool("get_total_distance_and_efficiency", {"car_name": "medic"})
+        )
+        monthly = rows_from(
+            await session.call_tool("get_monthly_driving_summary", {"car_name": "medic"})
+        )
+
+    assert [r["distance_km"] for r in longest] == [10.0, 10.0]
+    assert total[0]["total_drives"] == 2
+    assert sum(r["total_trips"] for r in monthly) == 2
+
+
+async def test_period_comparison_ignores_the_session_time_zone(seeded_database) -> None:
+    """Regression: start_date is naive UTC, and against a bare now() PostgreSQL read
+    it in the session time zone, shifting both windows by that zone's offset. In a
+    +9 h session a drive from 20 hours ago looked 29 hours old."""
+    async with await psycopg.AsyncConnection.connect(seeded_database, autocommit=True) as conn:
+        await conn.execute("INSERT INTO car_settings (id) VALUES (77)")
+        await conn.execute("INSERT INTO cars (id, name, settings_id) VALUES (77, 'Zone Probe', 77)")
+        await conn.execute(
+            "INSERT INTO drives (car_id, start_date, end_date, distance) VALUES "
+            "(77, (now() AT TIME ZONE 'UTC') - interval '20 hours', "
+            "(now() AT TIME ZONE 'UTC') - interval '19 hours', 30.0)"
+        )
+    separator = "&" if "?" in seeded_database else "?"
+    tokyo = f"{seeded_database}{separator}options=-c%20timezone%3DAsia%2FTokyo"
+    mcp = create_server(Settings(database_url=tokyo))  # type: ignore[call-arg]
+    try:
+        async with Client(mcp, raise_exceptions=False) as session:
+            zone = rows_from(
+                await session.call_tool("run_sql", {"query": "SELECT current_setting('TimeZone')"})
+            )
+            rows = rows_from(
+                await session.call_tool(
+                    "get_period_comparison", {"days": 1, "car_name": "zone probe"}
+                )
+            )
+    finally:
+        await mcp.teslamate_app_context.pool.close()  # type: ignore[attr-defined]
+
+    assert zone[0]["current_setting"] == "Asia/Tokyo"
+    metrics = {r["metric"]: r for r in rows}
+    assert metrics["drive_count"]["current_value"] == 1.0
+    assert metrics["distance_km"]["current_value"] == 30.0
+    assert metrics["drive_count"]["previous_value"] == 0.0

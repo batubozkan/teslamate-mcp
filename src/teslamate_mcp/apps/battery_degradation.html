@@ -230,11 +230,14 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
-  if (!rows.length) {
+  // A hover belongs to the rows it was made on: drop the index and its tooltip.
+  hoverIndex = -1;
+  document.getElementById("tooltip").style.display = "none";
+  buildModel();
+  if (!months.length) {
     showState("No full-charge range samples found (the trend needs positions logged at 100%).");
     return;
   }
-  buildModel();
   showData();
   renderStats();
   renderLegend();
@@ -425,7 +428,12 @@ function render() {
       .map((m, i) => (i ? "L" : "M") + x(m.getTime()).toFixed(1) + " "
         + y(s.byMonth.get(m.getTime()).avg).toFixed(1))
       .join(" ");
-    svg.append(el("path", { d, class: "series-line", stroke: s.color }));
+    if (pts.length === 1) {
+      const only = pts[0].getTime();
+      svg.append(el("circle", { cx: x(only), cy: y(s.byMonth.get(only).avg), r: 2.5, fill: s.color }));
+    } else {
+      svg.append(el("path", { d, class: "series-line", stroke: s.color }));
+    }
   }
 
   const maxLabels = Math.max(2, Math.floor(plotW / 64));

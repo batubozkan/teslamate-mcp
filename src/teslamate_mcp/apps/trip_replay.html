@@ -276,6 +276,7 @@ window.addEventListener("message", (event) => {
     onToolInput((msg.params && msg.params.arguments) || {}); return;
   }
   if (msg.method === "ui/notifications/tool-cancelled") {
+    pause();
     showState("Tool call was cancelled."); return;
   }
   if (msg.method === "ui/notifications/host-context-changed") {
@@ -350,14 +351,19 @@ function extractRows(result) {
 function onToolResult(result) {
   if (result.isError) {
     const text = (result.content || []).map((c) => c.text || "").join(" ");
+    pause();
     showState("Could not load the route. " + text);
     return;
   }
   rows = extractRows(result);
   pause();
+  // Nothing of the trip before may stay on screen.
+  showSummary(false);
+  document.getElementById("card").classList.remove("show");
   if (scene) { scene.remove(); scene = null; } // new rows get a new map
   buildModel();
   if (points.length < 2) {
+    points = []; // a resize must not render a trip that has no story
     showState("Not enough timed GPS positions recorded for this trip to replay it.");
     return;
   }
@@ -420,9 +426,11 @@ let segments = []; // {kind: "drive"|"stop", s0, s1, i0, i1, t0, t1, charging, m
 let storyLength = 0;
 let stopMarks = []; // the stop segments, in order
 let pointStory = []; // playback second at each track point (drives only)
+let legCount = 0; // drives in the trip; the HUD reads it every frame
 
 function buildStory() {
   segments = [];
+  legCount = new Set(points.map((p) => p.leg)).size;
   const legsStart = [0];
   for (let i = 1; i < points.length; i++) if (points[i].leg !== points[i - 1].leg) legsStart.push(i);
   const legs = legsStart.map((i0, k) => [i0, (legsStart[k + 1] || points.length) - 1]);
@@ -588,7 +596,11 @@ function seek(s) {
   updateButtons();
   if (scene && cameraMode === "follow") scene.startTransition(0.5);
   frame(0);
-  if (!playing && scene && scene.animating()) { lastFrame = 0; raf = requestAnimationFrame(tick); }
+  if (!playing && scene && scene.animating()) {
+    lastFrame = 0;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(tick);
+  }
 }
 
 function tick(now) {
@@ -624,7 +636,7 @@ function frame(dt) {
 
 let lastHud = "";
 function renderHud(st) {
-  const legs = new Set(points.map((p) => p.leg)).size;
+  const legs = legCount;
   const leg = st.seg.kind === "stop" ? null : points[st.seg.i0].leg;
   const dist = st.odo != null && points[0].odo != null ? st.odo - points[0].odo : null;
   const key = [Math.floor(st.t / 60000), leg, st.soc, dist != null ? dist.toFixed(1) : ""].join("|");

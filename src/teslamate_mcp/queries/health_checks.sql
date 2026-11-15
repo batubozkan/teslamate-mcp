@@ -232,7 +232,7 @@ checks AS (
         o.drives + o.charges,
         'rows',
         format('%%s drives and %%s charges have no end (TeslaMate lost the car mid-way); most '
-            'reports skip them. get_logging_gaps lists them.', o.drives, o.charges)
+            'reports skip them. get_logging_gaps with min_hours=6 lists them.', o.drives, o.charges)
     FROM open_rows o
     UNION ALL
     SELECT sc.id,
@@ -243,7 +243,8 @@ checks AS (
             WHEN t.spread >= 0.2 OR t.leak_gap >= 0.15 THEN 'warn'
             ELSE 'ok'
         END,
-        ROUND(GREATEST(t.spread, COALESCE(t.leak_gap, 0))::numeric, 2),
+        CASE WHEN t.fl IS NOT NULL
+            THEN ROUND(GREATEST(t.spread, COALESCE(t.leak_gap, 0))::numeric, 2) END,
         'bar',
         CASE WHEN t.fl IS NULL THEN 'No tire pressure readings.'
         ELSE format('Last week of readings: FL %%s, FR %%s, RL %%s, RR %%s bar (spread %%s). '

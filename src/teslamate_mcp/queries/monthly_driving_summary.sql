@@ -8,7 +8,8 @@ SELECT c.name as car_name,
     MAX(d.speed_max) as max_speed_reached
 FROM drives d
     JOIN cars c ON d.car_id = c.id
-WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+WHERE d.end_date IS NOT NULL -- a drive still open is not a drive yet
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
     AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
 GROUP BY c.id,
     c.name,

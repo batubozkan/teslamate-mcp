@@ -120,16 +120,16 @@ Option B — manual (**Docker → Add Container**):
 
 ```bash
 curl http://192.168.1.100:8888/health
-# → {"status":"ok","version":"0.6.0"}   (or newer)
+# → {"status":"ok","version":"0.18.4","database":"ok"}   (or newer)
 
 curl -i http://192.168.1.100:8888/mcp
 # → HTTP 401 (bearer auth active)
 ```
 
-> **Important:** `/health` and the 401 check do **not** touch the database. A *missing*
-> `DATABASE_URL` fails at startup, but a *wrong* one (bad host/password) only surfaces on
-> the **first real MCP request** — the session hangs (SSE pings only), times out, and all
-> subsequent requests return `500` until the container is restarted. Never use `localhost`
+> **Important:** `/health` runs a `SELECT 1` against the database (0.10.0+). A *missing*
+> `DATABASE_URL` fails at startup; a *wrong* one (bad host/password) starts, and `/health`
+> then answers `503` with `"database":"unreachable"` and a short `detail` while every tool
+> call returns an error. Never use `localhost`
 > as the DB host: inside the container it points at the container itself, not the Unraid
 > host. Use `192.168.1.100`. Test connectivity from inside the container with:
 > `docker exec teslamate-mcp python -c "import os,psycopg; psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=5); print('DB OK')"`
@@ -203,8 +203,8 @@ curl -s -X POST https://teslamate-mcp.your-domain.com/mcp \
 
 teslamate-mcp does not implement OAuth/dynamic client registration, so **Custom Headers**
 is the correct (and documented) auth method for it. Save — Cloudflare connects, syncs
-capabilities, and the server status becomes **Ready** (27 tools with writes enabled as of
-0.7.0 — incl. the `show_charging_curve` MCP Apps chart — 7 prompts, 3 resources).
+capabilities, and the server status becomes **Ready** (78 tools, 79 with writes enabled,
+and 12 prompts as of 0.18 — incl. the `show_*` MCP Apps charts).
 After deploying a new server version with added/changed tools, force **⋯ → Sync capabilities**
 on the MCP server entry (auto-resync is ~2h).
 
@@ -361,7 +361,7 @@ Two distinct failures, in the order you're likely to meet them:
 - [ ] `curl https://teslamate-mcp.your-domain.com/health` → 200 (tunnel)
 - [ ] `curl https://teslamate-mcp.your-domain.com/mcp` without token → **401**
 - [ ] MCP initialize with bearer token → success (Phase 2.4)
-- [ ] Portal dashboard: server **Ready**, 25 tools synced (26 with `ENABLE_CHARGING_WRITES=true`, 0.5.0+)
+- [ ] Portal dashboard: server **Ready**, 78 tools synced (79 with `ENABLE_CHARGING_WRITES=true`)
 - [ ] Client connected via portal URL; `get_basic_car_information` returns your car
 - [ ] Negative: `run_sql` with `DELETE FROM cars` → rejected (validator + READ ONLY txn)
 
@@ -381,7 +381,7 @@ them to sessions (`search_charging_sessions`) and set each cost (`set_charging_c
 2. **Enable the flag** — teslamate-mcp container → add env `ENABLE_CHARGING_WRITES=true` →
    Apply.
 3. **Re-sync the portal** — AI controls → MCP servers → teslamate-mcp → ⋯ → Sync
-   capabilities → 26 tools.
+   capabilities → 79 tools.
 4. claude.ai will ask for approval on each write call (or choose "always allow" for the
    connector). The portal's per-tool toggle can hide `set_charging_cost` again at any time
    without touching the server.
@@ -401,7 +401,7 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 | `500` on every request, log shows `Task group is not initialized` + Postgres says `remaining connection slots are reserved` | Pre-0.5.1 per-session pool leak — restart the container to free the connections and upgrade to `0.5.1+` (shared pool) |
 | `522` on `teslamate-mcp.your-domain.com` | cloudflared container down or wrong service URL in public hostname |
 | `522` on `mcp.your-domain.com` | Portal DNS CNAME missing (should point to `gateway.agents.cloudflare.com`) |
-| Container restarts at boot | Bad `DATABASE_URL` (fail-fast) — check container log |
+| Container restarts at boot | `DATABASE_URL` missing, or another setting invalid (fail-fast) — check container log |
 | `401` even with token | Token mismatch: compare container `AUTH_TOKEN` vs portal custom header (`Bearer ` prefix included?) |
 | Portal server stuck "Sync Required" | Re-save the custom header credentials; **⋯ → Sync capabilities** |
 | Sync fails `HTTP 403` / `Error POSTing to endpoint: error code: 1003` | Trailing-slash mismatch: the portal's saved hostname ends in `/mcp/` (SDK v1's canonical form, and the hostname field is immutable) while SDK v2 serves `/mcp` and 307-redirects `/mcp/`; uvicorn's redirect behind the tunnel has a malformed `Location`, which Cloudflare rejects as 1003. Fixed in **0.6.1** — the server normalizes `/mcp/` to `/mcp`, so both forms answer directly. Upgrade the container, then **Sync capabilities** |

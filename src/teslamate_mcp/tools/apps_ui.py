@@ -19,7 +19,7 @@ from mcp.types import ToolAnnotations
 
 from .registry import PredefinedTool, make_query_handler
 
-# Basemap for the map views (drive, trip, places). They draw with MapLibre GL,
+# Basemap for the map views (drive, trip, replay, places, roads). They draw with MapLibre GL,
 # inlined from apps/vendor/ so nothing loads from a CDN, over CARTO's keyless
 # vector styles (Positron / Dark Matter): the style from MAP_STYLE_HOST, then
 # tiles, fonts, and sprites from the tile hosts. Where MapLibre cannot run (no
@@ -333,8 +333,6 @@ APP_SPECS: tuple[AppSpec, ...] = (
         ),
     ),
 )
-
-CHARGING_CURVE_APP_URI = APP_SPECS[0].uri
 
 MAP_CSP = ResourceCsp(
     connect_domains=list(MAP_VECTOR_HOSTS),

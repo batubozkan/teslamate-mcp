@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Fixed
+- `get_battery_health_summary` read its ranges from the newest position row,
+  which while driving (or when the last logged row was a streamed one) carries
+  none, so every range column came back null. It now reads the newest row
+  that has range data, which also uses TeslaMate's partial index: the lookup
+  drops from seconds to under a millisecond on a large `positions` table. A
+  car with no such row still gets its charging-based columns.
+- `get_battery_degradation_over_time` counted rows without a range in
+  `data_points` (many times too high) and scanned them all; both fixed.
+- `get_period_comparison` compared UTC timestamps with a bare `now()`, so on a
+  database whose session time zone is not UTC both windows were shifted by
+  that offset.
+- `get_longest_drives_by_distance` listed a drive still in progress first
+  (no distance sorts first); `get_monthly_driving_summary` and
+  `get_total_distance_and_efficiency` counted it as a drive.
+- `get_health_checks`: the tire value is null, not 0, when there are no
+  readings, and the open-records text now names the `get_logging_gaps`
+  setting that shows those rows.
+- `show_trip_replay`: dragging the timeline started a new animation loop on
+  every move and never stopped the old ones, so after a scrub the car and
+  camera lost their easing. A cancelled or failed call now pauses playback,
+  and a second trip no longer starts under the first one's summary or stop
+  card.
+- Chart and map views: a hover left over from an earlier result could break
+  the next render or leave its tooltip over the new chart; a result whose rows were all unusable left an empty view
+  instead of the message; a series with a single point drew nothing; a flat
+  x-range stacked the axis labels (`show_charging_curve_comparison`,
+  `show_efficiency_vs_temperature`). `show_drive_route` and `show_trip_route`
+  no longer rebuild the previous map behind an empty result.
+- `docker-compose.yml` passed only five settings to the container, so
+  `MAP_TILES`, `CF_ACCESS_*`, the timeouts, and the pool sizes set in `.env`
+  were ignored. `.dockerignore` now leaves `.venv` out of the build context.
+- The Unraid template gained `REPORT_TIMEZONE`, `ENABLE_CHARGING_WRITES`, and
+  `STATEMENT_TIMEOUT_MS`. The Unraid guide still described a `/health` that
+  did not touch the database and tool counts from 0.5–0.7; a test now keeps
+  the counts in the template and the guide in step with the server.
+
 ## [0.18.4] - 2026-11-10
 
 ### Fixed

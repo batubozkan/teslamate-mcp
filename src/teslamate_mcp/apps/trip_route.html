@@ -249,11 +249,8 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
+  hideHover(); // an index into the old rows means nothing in the new ones
   if (gl) { gl.remove(); gl = null; hoverMarker = null; } // new rows get a new map
-  if (!rows.length) {
-    showState("No GPS positions recorded for this trip.");
-    return;
-  }
   buildModel();
   if (!points.length) {
     showState("No GPS positions recorded for this trip.");

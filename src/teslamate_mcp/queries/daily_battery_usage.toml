@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Window in days. The default preserves the tool's original window."
+description = "How many days back to look."
 default = 30
 minimum = 1
 

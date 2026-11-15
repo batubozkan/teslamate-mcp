@@ -68,8 +68,7 @@
   .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
   .stat .v { font-size: 15px; font-weight: 600; }
   .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
-  .legend { flex-direction: column; gap: 4px; }
+  .legend { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 12px; }
   .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
   .legend .peak { color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .legend .key { width: 12px; height: 0; border-top: 2.5px solid; flex: none; }
@@ -233,6 +232,9 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
+  // A hover belongs to the rows it was made on: drop the index and its tooltip.
+  hoverIndex = -1;
+  document.getElementById("tooltip").style.display = "none";
   buildModel();
   if (!levels.length) {
     showState("No charging samples found for these sessions.");
@@ -417,8 +419,9 @@ function render() {
   svg.setAttribute("height", height);
   svg.replaceChildren();
 
-  const lo = Math.max(0, Math.floor(levels[0] / 10) * 10);
-  const hi = Math.min(100, Math.ceil(levels[levels.length - 1] / 10) * 10);
+  let lo = Math.max(0, Math.floor(levels[0] / 10) * 10);
+  let hi = Math.min(100, Math.ceil(levels[levels.length - 1] / 10) * 10);
+  if (hi === lo) { if (hi < 100) hi += 10; else lo -= 10; }
   const plotW = width - M.left - M.right;
   const x = (l) => M.left + (hi === lo ? plotW / 2 : ((l - lo) / (hi - lo)) * plotW);
 

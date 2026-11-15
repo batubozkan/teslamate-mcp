@@ -6,8 +6,11 @@
 # NOTE: README.md must stay in the build context because pyproject.toml
 # references it via `readme = "README.md"` and hatchling reads it at
 # wheel-build time inside the builder stage.
-REMOTE_DEPLOYMENT.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
 assets/
+deploy/
 
 # Environment files
 .env
@@ -15,9 +18,12 @@ assets/
 env.example
 
 # Development files
+.venv/
+.claude/
 *.pyc
 __pycache__/
 .pytest_cache/
+.ruff_cache/
 .coverage
 *.log
 
@@ -45,5 +51,3 @@ build/
 tests/
 test_*.py
 
-# Logs directory (will be mounted as volume)
-logs/ 

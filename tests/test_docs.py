@@ -39,3 +39,34 @@ async def test_readme_counts_match() -> None:
     assert reports and int(reports.group(1)) == len(discover_predefined_tools())
     charts = re.search(r"\*\*(\d+) interactive charts", _README)
     assert charts and int(charts.group(1)) == len(APP_SPECS)
+    section = re.search(r"### Charts \((\d+)\)", _README)
+    assert section and int(section.group(1)) == len(APP_SPECS)
+
+
+@pytest.mark.asyncio
+async def test_unraid_docs_counts_match() -> None:
+    """The Unraid guide said 25, 26, and 27 tools while the server had 78."""
+    unraid = Path(__file__).resolve().parents[1] / "deploy" / "unraid"
+    mcp = create_server(Settings(database_url=_DUMMY_DB_URL))  # type: ignore[call-arg]
+    tools, prompts = len(await mcp.list_tools()), len(await mcp.list_prompts())
+
+    template = (unraid / "teslamate-mcp.xml").read_text(encoding="utf-8")
+    overview = re.search(
+        r"(\d+) tools \((\d+) predefined[^)]*?(\d+) interactive[^)]*\), (\d+) prompts",
+        template,
+        re.DOTALL,
+    )
+    assert overview, "Unraid template overview lost its counts"
+    assert tuple(map(int, overview.groups())) == (
+        tools,
+        len(discover_predefined_tools()),
+        len(APP_SPECS),
+        prompts,
+    )
+
+    guide = (unraid / "UNRAID_CLOUDFLARE_DEPLOYMENT.md").read_text(encoding="utf-8")
+    counts = {int(n) for n in re.findall(r"(\d+) tools", guide)}
+    # The write tool is opt-in, so the guide names both totals.
+    assert counts == {tools, tools + 1}, sorted(counts)
+    listed = re.search(r"(\d+) prompts", guide)
+    assert listed and int(listed.group(1)) == prompts

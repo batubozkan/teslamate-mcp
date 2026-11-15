@@ -247,6 +247,7 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
+  hideHover(); // an index into the old rows means nothing in the new ones
   if (gl) { gl.remove(); gl = null; } // new rows get a new map
   buildModel();
   if (!places.length) {

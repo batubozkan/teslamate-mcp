@@ -3,6 +3,7 @@ docs_internal/
 
 # Local AI-assistant instructions (kept out of the public tree)
 /CLAUDE.md
+.claude/settings.local.json
 
 # Python-generated files
 __pycache__/

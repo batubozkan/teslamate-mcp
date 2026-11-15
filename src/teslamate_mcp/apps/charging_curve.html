@@ -217,11 +217,14 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
-  if (!rows.length) {
+  // A hover belongs to the rows it was made on: drop the index and its tooltip.
+  hoverIndex = -1;
+  document.getElementById("tooltip").style.display = "none";
+  buildModel();
+  if (!points.length) {
     showState("No charge points recorded for this session.");
     return;
   }
-  buildModel();
   showData();
   renderStats();
   renderTable();
@@ -272,8 +275,9 @@ function fmtDur(ms) {
 }
 
 function renderStats() {
-  const socStart = rows[0].battery_level_start;
-  const socEnd = rows[rows.length - 1].battery_level_end;
+  const socStart = points[0].soc;
+  const ends = rows.map((r) => r.battery_level_end).filter((v) => v != null);
+  const socEnd = ends.length ? ends[ends.length - 1] : points[points.length - 1].soc;
   const peak = Math.max(...rows.map((r) => r.max_power_kw || 0));
   const dur = points[points.length - 1].t - points[0].t;
   const temps = rows.map((r) => r.avg_outside_temp).filter((v) => v != null);
@@ -392,11 +396,15 @@ function render() {
     svg.append(el("line", {
       x1: M.left, x2: width - M.right, y1: panel.top + panel.h, y2: panel.top + panel.h, class: "base-line",
     }));
-    const d = points
-      .filter((p) => panel.get(p) != null)
+    const drawn = points.filter((p) => panel.get(p) != null);
+    const d = drawn
       .map((p, i) => (i ? "L" : "M") + x(p.t.getTime()).toFixed(1) + " " + y(panel.get(p)).toFixed(1))
       .join(" ");
-    svg.append(el("path", { d, class: "series-line", stroke: panel.color }));
+    if (drawn.length === 1) {
+      svg.append(el("circle", { cx: x(drawn[0].t.getTime()), cy: y(panel.get(drawn[0])), r: 2.5, fill: panel.color }));
+    } else {
+      svg.append(el("path", { d, class: "series-line", stroke: panel.color }));
+    }
   }
 
   const bottomPanel = panels[1];

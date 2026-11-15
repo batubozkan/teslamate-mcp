@@ -110,7 +110,7 @@
   <div class="stats" id="stats" hidden></div>
   <div class="legend" id="legend" hidden></div>
   <div class="chart-wrap" id="chartWrap" hidden>
-    <svg id="chart" role="img" tabindex="0" aria-label="Consumption of each drive against outside temperature, with the 5-degree average. Use arrow keys to step through the temperature bands."></svg>
+    <svg id="chart" role="img" tabindex="0" aria-label="Consumption of each drive against outside temperature, with the 5-degree average. Use arrow keys to step through the drives."></svg>
     <div class="tooltip" id="tooltip"></div>
   </div>
   <div class="state" id="state">Waiting for the drives…</div>
@@ -234,6 +234,9 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
+  // A hover belongs to the rows it was made on: drop the index and its tooltip.
+  hoverIndex = -1;
+  document.getElementById("tooltip").style.display = "none";
   buildModel();
   if (!points.length) {
     showState("No drives with temperature and consumption data found.");
@@ -410,7 +413,8 @@ function render() {
   svg.replaceChildren();
 
   const ts = points.map((p) => p.t), whs = points.map((p) => p.wh);
-  const tLo = Math.floor(Math.min(...ts) / BAND) * BAND, tHi = Math.ceil(Math.max(...ts) / BAND) * BAND;
+  const tLo = Math.floor(Math.min(...ts) / BAND) * BAND;
+  const tHi = Math.max(Math.ceil(Math.max(...ts) / BAND) * BAND, tLo + BAND);
   const whPad = Math.max(10, (Math.max(...whs) - Math.min(...whs)) * 0.08);
   const whLo = Math.max(0, Math.min(...whs) - whPad), whHi = Math.max(...whs) + whPad;
   const plotW = width - M.left - M.right;

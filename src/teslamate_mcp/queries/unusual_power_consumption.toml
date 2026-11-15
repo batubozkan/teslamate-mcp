@@ -15,7 +15,7 @@ minimum = 1
 [[params]]
 name = "threshold_pct"
 type = "number"
-description = "Flag drives whose range consumption exceeds this percent of distance driven. The default preserves the tool's original threshold."
+description = "Flag drives whose range consumption exceeds this percent of distance driven."
 default = 150
 minimum = 100
 maximum = 1000

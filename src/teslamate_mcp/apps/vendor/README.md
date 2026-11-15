@@ -1,7 +1,7 @@
 # Vendored front-end libraries
 
-The map views (`drive_route.html`, `trip_route.html`, `visited_places.html`)
-draw with MapLibre GL JS. The server inlines these files into the view it
+The map views (`drive_route.html`, `trip_route.html`, `trip_replay.html`,
+`visited_places.html`, `driven_roads.html`) draw with MapLibre GL JS. The server inlines these files into the view it
 serves, so nothing is loaded from a CDN.
 
 | File | Source | Version | License |

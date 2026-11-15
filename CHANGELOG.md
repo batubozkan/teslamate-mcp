@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-16
+
 The tools now share one meaning for "last N days", for what a drive and a
 charging session are, for a cost nobody recorded, and for the name of a place.
 Several numbers change with that; the first section says which and why.

@@ -12,8 +12,10 @@ WHERE p.battery_level = 100 -- Only look at full charges
     -- partial (car_id, date) index.
     AND p.rated_battery_range_km IS NOT NULL
     AND p.ideal_battery_range_km IS NOT NULL
-    AND p.date >= (date_trunc('month', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
-            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
+    AND (p.date >= (SELECT (date_trunc('month', (now() - make_interval(days => %(days)s::int))
+                AT TIME ZONE %(tz)s::text) AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC')
+            AND p.date >= (now() AT TIME ZONE 'UTC')
+                - make_interval(days => %(days)s::int + 31))
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.id,
     c.name,

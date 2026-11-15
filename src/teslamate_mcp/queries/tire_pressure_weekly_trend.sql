@@ -16,8 +16,10 @@ WHERE p.tpms_pressure_fl IS NOT NULL
     AND p.tpms_pressure_fr IS NOT NULL
     AND p.tpms_pressure_rl IS NOT NULL
     AND p.tpms_pressure_rr IS NOT NULL
-    AND p.date >= (date_trunc('week', (now() - make_interval(days => %(days)s::int)) AT TIME ZONE %(tz)s::text)
-            AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC'
+    AND (p.date >= (SELECT (date_trunc('week', (now() - make_interval(days => %(days)s::int))
+                AT TIME ZONE %(tz)s::text) AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC')
+            AND p.date >= (now() AT TIME ZONE 'UTC')
+                - make_interval(days => %(days)s::int + 7))
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.id,
     c.name,

@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-11-15
+
 ### Fixed
 - `get_battery_health_summary` read its ranges from the newest position row,
   which while driving (or when the last logged row was a streamed one) carries

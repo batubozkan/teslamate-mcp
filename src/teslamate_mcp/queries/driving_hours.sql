@@ -14,7 +14,7 @@ FROM drives d
         SELECT (d.start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text AS local_start
     ) l
 WHERE d.end_date IS NOT NULL
-    AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+    AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.name, 2, 3, 4
 ORDER BY c.name, 2, 4;

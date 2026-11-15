@@ -34,7 +34,7 @@ ends AS (
     WHERE d.end_date IS NOT NULL
         AND d.duration_min > 0
         AND d.distance >= %(min_distance_km)s::float8
-        AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 -- A cell is as wide as it is high: its span in degrees of longitude grows

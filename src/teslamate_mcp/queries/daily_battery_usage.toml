@@ -1,5 +1,5 @@
 name = "get_daily_battery_usage_patterns"
-description = "Returns per-car daily battery usage over the last 30 days by default: min and max battery level (%) and the daily swing (max minus min, percentage points) per local calendar day, keeping only days where the swing exceeds min_swing_pct (default 5). Optional filters: car_name, days, min_swing_pct."
+description = "Returns per-car daily battery usage over the last 30 days by default: min and max battery level (%) and the daily swing (max minus min, percentage points) per local calendar day (the first day of the window is a whole one), keeping only days where the swing exceeds min_swing_pct (default 5). Optional filters: car_name, days, min_swing_pct."
 
 [[params]]
 name = "car_name"

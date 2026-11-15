@@ -68,6 +68,11 @@ type = "number"
 description = "Sum of recorded costs; null when no session in the bucket has one."
 
 [[output]]
+name = "sessions_without_cost"
+type = "integer"
+description = "Sessions with no recorded cost; the cost leaves them out."
+
+[[output]]
 name = "avg_outside_temp"
 type = "number"
 description = "Driving-time-weighted outside temperature, °C."

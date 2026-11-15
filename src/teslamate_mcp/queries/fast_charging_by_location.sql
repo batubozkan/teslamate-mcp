@@ -11,6 +11,7 @@ sessions AS (
         cp.start_date,
         cp.duration_min,
         cp.charge_energy_added,
+        GREATEST(cp.charge_energy_used, cp.charge_energy_added) AS billed_kwh,
         cp.start_battery_level,
         cp.end_battery_level,
         cp.outside_temp_avg,
@@ -21,7 +22,7 @@ sessions AS (
         JOIN cars c ON c.id = cp.car_id
     WHERE cp.end_date IS NOT NULL
         AND cp.charge_energy_added >= 1
-        AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 -- DC: a sample came from a fast charger, or had no AC phases while power
@@ -85,7 +86,7 @@ SELECT d.location,
     ROUND(AVG(d.minutes_20_to_80)::numeric) AS avg_minutes_20_to_80,
     ROUND(SUM(d.charge_energy_added)::numeric, 1) AS energy_added_kwh,
     ROUND((SUM(d.cost)
-        / NULLIF(SUM(d.charge_energy_added) FILTER (WHERE d.cost IS NOT NULL), 0))::numeric, 3)
+        / NULLIF(SUM(d.billed_kwh) FILTER (WHERE d.cost IS NOT NULL), 0))::numeric, 3)
         AS avg_cost_per_kwh,
     COUNT(*) FILTER (WHERE d.battery_heater) AS sessions_with_battery_heating,
     MAX(d.start_date) AS last_visit

@@ -11,7 +11,9 @@ WITH scope AS (
         d.start_rated_range_km,
         d.end_rated_range_km,
         d.start_address_id,
-        d.end_address_id
+        d.end_address_id,
+        d.start_geofence_id,
+        d.end_geofence_id
     FROM drives d
         JOIN cars c ON c.id = d.car_id
     WHERE d.end_date IS NOT NULL
@@ -99,9 +101,9 @@ drive_rows AS (
         t.end_date,
         t.duration_min::numeric AS duration_min,
         ROUND(t.distance::numeric, 1) AS distance_km,
-        sa.display_name AS from_location,
+        COALESCE(sg.name, sa.display_name) AS from_location,
         sa.city AS from_city,
-        ea.display_name AS to_location,
+        COALESCE(eg.name, ea.display_name) AS to_location,
         ea.city AS to_city,
         t.speed_max AS speed_max_kmh,
         ROUND((t.start_rated_range_km - t.end_rated_range_km)::numeric, 1) AS rated_range_used_km,
@@ -111,6 +113,8 @@ drive_rows AS (
     FROM this_trip t
         LEFT JOIN addresses sa ON sa.id = t.start_address_id
         LEFT JOIN addresses ea ON ea.id = t.end_address_id
+        LEFT JOIN geofences sg ON sg.id = t.start_geofence_id
+        LEFT JOIN geofences eg ON eg.id = t.end_geofence_id
 ),
 stop_rows AS (
     SELECT t.prev_end AS sort_key,
@@ -122,9 +126,9 @@ stop_rows AS (
         t.start_date AS end_date,
         ROUND(t.stop_before_min::numeric) AS duration_min,
         NULL::numeric AS distance_km,
-        COALESCE(ca.display_name, pa.display_name) AS from_location,
+        COALESCE(cg.name, pg.name, ca.display_name, pa.display_name) AS from_location,
         COALESCE(ca.city, pa.city) AS from_city,
-        COALESCE(ca.display_name, pa.display_name) AS to_location,
+        COALESCE(cg.name, pg.name, ca.display_name, pa.display_name) AS to_location,
         COALESCE(ca.city, pa.city) AS to_city,
         NULL::int AS speed_max_kmh,
         NULL::numeric AS rated_range_used_km,
@@ -137,7 +141,8 @@ stop_rows AS (
             SELECT SUM(cp.charge_energy_added) AS added_kwh,
                 (ARRAY_AGG(cp.start_battery_level ORDER BY cp.start_date))[1]::int AS start_level,
                 (ARRAY_AGG(cp.end_battery_level ORDER BY cp.start_date DESC))[1]::int AS end_level,
-                (ARRAY_AGG(cp.address_id ORDER BY cp.start_date))[1] AS address_id
+                (ARRAY_AGG(cp.address_id ORDER BY cp.start_date))[1] AS address_id,
+                (ARRAY_AGG(cp.geofence_id ORDER BY cp.start_date))[1] AS geofence_id
             FROM charging_processes cp
             WHERE t.charged_before
                 AND cp.car_id = t.car_id
@@ -145,6 +150,10 @@ stop_rows AS (
                 AND cp.start_date < t.start_date
         ) chg ON TRUE
         LEFT JOIN addresses ca ON ca.id = chg.address_id
+        LEFT JOIN geofences cg ON cg.id = chg.geofence_id
+        -- Where the leg before ended.
+        LEFT JOIN this_trip pt ON pt.leg = t.leg - 1
+        LEFT JOIN geofences pg ON pg.id = pt.end_geofence_id
     WHERE t.leg > 1
 )
 SELECT ROW_NUMBER() OVER (ORDER BY r.sort_key, r.sort_rank) AS seq,

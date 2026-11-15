@@ -64,13 +64,15 @@ charge_agg AS (
             ELSE cd.day END AS bucket,
         COUNT(*) AS sessions,
         SUM(cd.charge_energy_added) AS kwh_added,
-        SUM(cd.cost) AS cost
+        SUM(cd.cost) AS cost,
+        COUNT(*) FILTER (WHERE cd.cost IS NULL) AS sessions_without_cost
     FROM (
         SELECT ((cp.start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text)::date AS day,
             cp.charge_energy_added,
             cp.cost
         FROM charging_processes cp
         WHERE cp.end_date IS NOT NULL
+            AND cp.charge_energy_added > 0
             AND cp.car_id IN (SELECT id FROM scope_cars)
     ) cd
         CROSS JOIN bounds
@@ -88,6 +90,7 @@ SELECT TO_CHAR(b.bucket, CASE WHEN %(period)s::text = 'year' THEN 'YYYY-MM' ELSE
     COALESCE(ca.sessions, 0) AS charging_sessions,
     ROUND(COALESCE(ca.kwh_added, 0)::numeric, 1) AS kwh_added,
     ROUND(ca.cost::numeric, 2) AS charging_cost,
+    COALESCE(ca.sessions_without_cost, 0) AS sessions_without_cost,
     ROUND(da.temp::numeric, 1) AS avg_outside_temp
 FROM buckets b
     LEFT JOIN drive_agg da ON da.bucket = b.bucket

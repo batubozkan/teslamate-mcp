@@ -1,20 +1,31 @@
--- Latest position per car via a LATERAL top-1; see battery_health_summary.sql
--- for why the correlated MAX(date) subquery this replaces could not complete
--- on a large positions table.
+-- Newest position per car, in two steps, because `positions` has no index
+-- that finds a car's newest row directly (only BRIN indexes and a b-tree on
+-- car_id; the plain ORDER BY date DESC LIMIT 1 took over a second per car):
+-- `pr` is the newest polled row, found through TeslaMate's partial
+-- (car_id, date) index on rows with an ideal range, and `sr` is the newest
+-- row logged after it. The search for `sr` stops 7 days after `pr`: the BRIN
+-- index narrows a bounded date range, but an open-ended one reads every row
+-- any car logged since (0.3 s for a car that last logged months ago).
+-- Streamed rows without a polled one in between do not go on for days.
 --
--- Climate and tire values come from their own latest non-null rows. Most
--- in-drive rows have neither, so the latest row alone often reads null.
--- TeslaMate fills climate, tires, and ideal range only on polled rows, so the
--- ideal-range test lets both lookups use TeslaMate's partial (car_id, date)
--- index. Without it the plan cost passes jit_above_cost, and JIT adds about
--- 400 ms. The search stops 7 days before the latest row, so a car that never
--- reports tires does not scan its whole history.
+-- Rows streamed while driving or online carry position, speed, odometer and
+-- battery level, but no range, outside temperature or climate state:
+-- TeslaMate fills those on polled rows only. So range, outside temperature
+-- and climate on/off come from the newest polled row (range_at says when
+-- that was), and everything else from the newest row of either kind.
+--
+-- Cabin climate and tire values come from their own latest non-null rows,
+-- searched no further than 7 days before the latest row, so a car that never
+-- reports tires does not scan its whole history. The ideal-range test keeps
+-- both lookups on the partial index; without it the plan cost passes
+-- jit_above_cost, and JIT adds about 400 ms.
 SELECT c.name as car_name,
     p.battery_level,
-    p.rated_battery_range_km,
+    pr.rated_battery_range_km,
+    pr.date AS range_at,
     p.odometer,
-    p.outside_temp,
-    p.is_climate_on,
+    pr.outside_temp,
+    pr.is_climate_on,
     cl.inside_temp,
     cl.driver_temp_setting,
     cl.passenger_temp_setting,
@@ -44,12 +55,43 @@ SELECT c.name as car_name,
         ELSE st.start_date
     END AS car_state_since
 FROM cars c
-    CROSS JOIN LATERAL (
-        SELECT *
-        FROM positions p
-        WHERE p.car_id = c.id
-        ORDER BY p.date DESC
+    LEFT JOIN LATERAL (
+        SELECT pp.date,
+            pp.battery_level,
+            pp.rated_battery_range_km,
+            pp.odometer,
+            pp.outside_temp,
+            pp.is_climate_on,
+            pp.latitude,
+            pp.longitude,
+            pp.drive_id
+        FROM positions pp
+        WHERE pp.car_id = c.id
+            AND pp.ideal_battery_range_km IS NOT NULL
+        ORDER BY pp.date DESC
         LIMIT 1
+    ) pr ON true
+    LEFT JOIN LATERAL (
+        SELECT ps.date,
+            ps.battery_level,
+            ps.odometer,
+            ps.latitude,
+            ps.longitude,
+            ps.drive_id
+        FROM positions ps
+        WHERE ps.car_id = c.id
+            AND ps.date > COALESCE(pr.date, '-infinity')
+            AND ps.date <= COALESCE(pr.date + interval '7 days', 'infinity')
+        ORDER BY ps.date DESC
+        LIMIT 1
+    ) sr ON true
+    CROSS JOIN LATERAL (
+        SELECT COALESCE(sr.date, pr.date) AS date,
+            COALESCE(sr.battery_level, pr.battery_level) AS battery_level,
+            COALESCE(sr.odometer, pr.odometer) AS odometer,
+            COALESCE(sr.latitude, pr.latitude) AS latitude,
+            COALESCE(sr.longitude, pr.longitude) AS longitude,
+            CASE WHEN sr.date IS NOT NULL THEN sr.drive_id ELSE pr.drive_id END AS drive_id
     ) p
     LEFT JOIN LATERAL (
         SELECT pc.date,
@@ -120,4 +162,5 @@ FROM cars c
         ORDER BY cp.start_date DESC
         LIMIT 1
     ) chg ON true
-WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%');
+WHERE p.date IS NOT NULL -- a car with no positions has no status
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%');

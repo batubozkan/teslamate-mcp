@@ -149,7 +149,8 @@ window.addEventListener("message", (event) => {
   if (msg.method === "ui/notifications/host-context-changed") {
     const p = msg.params || {};
     if (p.theme) applyTheme(p.theme);
-    if (p.containerDimensions) render();
+    // The card lays itself out in CSS: a new size needs no rebuild, only a report.
+    if (p.containerDimensions) reportSize();
     return;
   }
   if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
@@ -377,12 +378,15 @@ function renderTable() {
 
 /* ---------- sizing ---------- */
 let sizeRaf = 0;
+// The root's own height, not the document's scrollHeight: that is never less
+// than the frame, so a host that sizes the frame from this report could not
+// shrink the view again after a closed table or a shorter result.
 function reportSize() {
   cancelAnimationFrame(sizeRaf);
   sizeRaf = requestAnimationFrame(() => {
     notify("ui/notifications/size-changed", {
       width: document.documentElement.scrollWidth,
-      height: document.documentElement.scrollHeight,
+      height: Math.ceil(document.getElementById("root").getBoundingClientRect().height),
     });
   });
 }

@@ -1,5 +1,5 @@
 name = "get_drive_summary_per_day"
-description = "Returns daily drive totals for the whole fleet (all cars combined): drive count, total distance (km), and total driving time (minutes) per local calendar day, most recent day first, unlimited rows by default. Optional filters: car_name, days, limit."
+description = "Returns daily drive totals for the whole fleet (all cars combined): drive count, total distance (km), and total driving time (minutes) per local calendar day, most recent day first, unlimited rows by default. Counts finished drives; with `days`, the first day of the window is a whole one. Optional filters: car_name, days, limit."
 
 [[params]]
 name = "car_name"
@@ -9,7 +9,7 @@ description = "Case-insensitive substring match on the car's name. Omit for all 
 [[params]]
 name = "days"
 type = "integer"
-description = "Restrict to the last N days. Omit for all time."
+description = "Restrict to the last N days (N x 24 hours back from now). Omit for all time."
 minimum = 1
 
 [[params]]

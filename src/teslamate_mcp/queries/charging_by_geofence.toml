@@ -1,5 +1,5 @@
 name = "get_charging_by_geofence"
-description = "Charging totals grouped by TeslaMate geofence (the user-defined named zones like Home or Work, more meaningful than reverse-geocoded addresses): session count, sessions with no recorded cost, energy added (kWh), total cost, and average cost per kWh over the sessions that have a cost. Sessions outside every geofence are grouped as 'Ungeofenced'. All cars combined unless filtered."
+description = "Charging totals grouped by TeslaMate geofence (the user-defined named zones like Home or Work, more meaningful than reverse-geocoded addresses): session count, sessions with no recorded cost, energy added (kWh), total cost, and average cost per kWh over the sessions that have a cost (per kWh billed: the larger of kWh drawn and kWh added). A session is a finished charge that added energy. Sessions outside every geofence are grouped as 'Ungeofenced'. All cars combined unless filtered."
 
 [[params]]
 name = "car_name"

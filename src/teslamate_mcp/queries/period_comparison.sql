@@ -1,39 +1,46 @@
 -- start_date is stored as naive UTC. Compared with a bare now(), PostgreSQL
--- reads it in the session time zone and both windows shift by that offset,
+-- reads it in the session time zone and shifts both windows by that offset,
 -- so now() is taken in UTC throughout.
-WITH drive_stats AS (
+--
+-- Drives are finished drives and sessions are finished charges that added
+-- energy, as in the other tools. A cost is null, not 0, when no session in
+-- the window has one recorded.
+WITH win AS (
+    SELECT (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int) AS cur_start,
+        (now() AT TIME ZONE 'UTC') - make_interval(days => 2 * %(days)s::int) AS prev_start
+),
+drive_stats AS (
     SELECT
-        COALESCE(SUM(d.distance) FILTER (WHERE d.start_date >= (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s::int)), 0) AS cur_distance,
-        COALESCE(SUM(d.distance) FILTER (WHERE d.start_date < (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)), 0) AS prev_distance,
-        COUNT(*) FILTER (WHERE d.start_date >= (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)) AS cur_drives,
-        COUNT(*) FILTER (WHERE d.start_date < (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)) AS prev_drives
+        COALESCE(SUM(d.distance) FILTER (WHERE d.start_date >= w.cur_start), 0) AS cur_distance,
+        COALESCE(SUM(d.distance) FILTER (WHERE d.start_date < w.cur_start), 0) AS prev_distance,
+        COUNT(*) FILTER (WHERE d.start_date >= w.cur_start) AS cur_drives,
+        COUNT(*) FILTER (WHERE d.start_date < w.cur_start) AS prev_drives
     FROM drives d
         JOIN cars c ON d.car_id = c.id
-    WHERE d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => 2 * %(days)s)
+        CROSS JOIN win w
+    WHERE d.end_date IS NOT NULL
+        AND d.start_date >= w.prev_start
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 charge_stats AS (
     SELECT
-        COALESCE(SUM(cp.charge_energy_added) FILTER (WHERE cp.start_date >= (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)), 0) AS cur_kwh,
-        COALESCE(SUM(cp.charge_energy_added) FILTER (WHERE cp.start_date < (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)), 0) AS prev_kwh,
-        COALESCE(SUM(cp.cost) FILTER (WHERE cp.start_date >= (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)), 0) AS cur_cost,
-        COALESCE(SUM(cp.cost) FILTER (WHERE cp.start_date < (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)), 0) AS prev_cost,
-        COUNT(*) FILTER (WHERE cp.start_date >= (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)) AS cur_sessions,
-        COUNT(*) FILTER (WHERE cp.start_date < (now() AT TIME ZONE 'UTC')
-            - make_interval(days => %(days)s)) AS prev_sessions
+        COALESCE(SUM(cp.charge_energy_added) FILTER (WHERE cp.start_date >= w.cur_start), 0)
+            AS cur_kwh,
+        COALESCE(SUM(cp.charge_energy_added) FILTER (WHERE cp.start_date < w.cur_start), 0)
+            AS prev_kwh,
+        SUM(cp.cost) FILTER (WHERE cp.start_date >= w.cur_start) AS cur_cost,
+        SUM(cp.cost) FILTER (WHERE cp.start_date < w.cur_start) AS prev_cost,
+        COUNT(*) FILTER (WHERE cp.start_date >= w.cur_start) AS cur_sessions,
+        COUNT(*) FILTER (WHERE cp.start_date < w.cur_start) AS prev_sessions,
+        COUNT(*) FILTER (WHERE cp.start_date >= w.cur_start AND cp.cost IS NULL) AS cur_uncosted,
+        COUNT(*) FILTER (WHERE cp.start_date < w.cur_start AND cp.cost IS NULL) AS prev_uncosted
     FROM charging_processes cp
         JOIN cars c ON cp.car_id = c.id
-    WHERE cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => 2 * %(days)s)
-        AND (%(car_name)s IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+        CROSS JOIN win w
+    WHERE cp.end_date IS NOT NULL
+        AND cp.charge_energy_added > 0
+        AND cp.start_date >= w.prev_start
+        AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 )
 SELECT 'distance_km' AS metric,
     ROUND(ds.cur_distance::numeric, 1) AS current_value,
@@ -65,4 +72,11 @@ SELECT 'charge_sessions',
     cs.prev_sessions::numeric,
     ROUND(100 * (cs.cur_sessions - cs.prev_sessions)::numeric
         / NULLIF(cs.prev_sessions::numeric, 0), 1)
+FROM charge_stats cs
+UNION ALL
+-- How much of charge_cost is missing: sessions with no recorded cost.
+SELECT 'charge_sessions_without_cost',
+    cs.cur_uncosted::numeric,
+    cs.prev_uncosted::numeric,
+    NULL::numeric
 FROM charge_stats cs;

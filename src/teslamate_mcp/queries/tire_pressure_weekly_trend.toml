@@ -1,5 +1,5 @@
 name = "get_tire_pressure_weekly_trends"
-description = "Per-car weekly tire pressure trend: average pressure per tire and overall weekly average (bar), plus reading count, bucketed by week in the report timezone. Defaults to the last 90 days. Optional filters: car_name, days."
+description = "Per-car weekly tire pressure trend: average pressure per tire and overall weekly average (bar), plus reading count, bucketed by week in the report timezone. Defaults to the last 90 days, starting with the week that day falls in, so the first week is a whole one. Optional filters: car_name, days."
 
 [[params]]
 name = "car_name"

@@ -1,5 +1,5 @@
 name = "search_drives"
-description = "Search individual drives (trips) with flexible filters: date range (local calendar dates), car, distance bounds (km), and free-text location match against start/end address or city. Returns drive_id (usable with get_drive_details), timestamps, distance km, duration, max speed, locations, rated range used, and consumption in Wh/km against what this car usually uses at the same outside temperature (vs_expected_pct: positive means it used more). Newest first by default; 50 rows max by default."
+description = "Search individual drives (trips) with flexible filters: date range (local calendar dates), car, distance bounds (km), and free-text location match against start/end geofence name, address, or city. Lists finished drives; a drive in progress shows in get_timeline. Returns drive_id (usable with get_drive_details), timestamps, distance km, duration, max speed, locations (the geofence name when the drive has one there, else the address), rated range used, and consumption in Wh/km against what this car usually uses at the same outside temperature (vs_expected_pct: positive means it used more). Newest first by default; 50 rows max by default."
 
 [[params]]
 name = "car_name"
@@ -31,7 +31,7 @@ minimum = 0
 [[params]]
 name = "location"
 type = "string"
-description = "Case-insensitive substring matched against start/end address names and cities."
+description = "Case-insensitive substring matched against start/end geofence names, address names, and cities."
 
 [[params]]
 name = "limit"

@@ -15,7 +15,7 @@ driving AS (
     FROM drives d
     WHERE d.car_id IN (SELECT id FROM scope_cars)
         AND d.end_date IS NOT NULL
-        AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
     GROUP BY d.car_id
 ),
 charging AS (
@@ -34,7 +34,8 @@ charging AS (
     FROM charging_processes cp
     WHERE cp.car_id IN (SELECT id FROM scope_cars)
         AND cp.end_date IS NOT NULL
-        AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND cp.charge_energy_added > 0
+        AND cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
     GROUP BY cp.car_id
 ),
 totals AS (

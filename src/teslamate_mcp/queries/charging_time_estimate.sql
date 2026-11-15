@@ -34,7 +34,7 @@ typed AS (
         LEFT JOIN geofences g ON g.id = cp.geofence_id
     WHERE cp.end_date IS NOT NULL
         AND cp.charge_energy_added >= 1
-        AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
         AND (%(location)s::text IS NULL
             OR a.display_name ILIKE '%%' || %(location)s || '%%'
             OR a.city ILIKE '%%' || %(location)s || '%%'

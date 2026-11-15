@@ -31,7 +31,8 @@ periods AS (
         COALESCE(dr.driving_s, 0) AS driving_s,
         COALESCE(dr.drives, 0) AS drives,
         COALESCE(ch.charging_s, 0) AS charging_s,
-        park.end_address_id
+        park.end_address_id,
+        park.end_geofence_id
     FROM scope sc
         -- Drives with no end_date are TeslaMate orphans; see state_history.sql.
         LEFT JOIN LATERAL (
@@ -64,7 +65,8 @@ periods AS (
         ) ch ON TRUE
         -- Where the car stood: the end of its last drive before the period ended.
         LEFT JOIN LATERAL (
-            SELECT d.end_address_id
+            SELECT d.end_address_id,
+                d.end_geofence_id
             FROM drives d
             WHERE d.car_id = sc.car_id
                 AND d.end_date IS NOT NULL
@@ -84,10 +86,11 @@ SELECT p.car_name,
         AS idle_awake_hours,
     p.drives AS drives_during,
     p.charging_s > 0 AS charged_during,
-    a.display_name AS location,
+    COALESCE(g.name, a.display_name) AS location,
     a.city
 FROM periods p
     LEFT JOIN addresses a ON a.id = p.end_address_id
+    LEFT JOIN geofences g ON g.id = p.end_geofence_id
 WHERE p.online_s - p.driving_s - p.charging_s >= %(min_idle_minutes)s::int * 60
 ORDER BY p.online_s - p.driving_s - p.charging_s DESC
 LIMIT %(limit)s::int;

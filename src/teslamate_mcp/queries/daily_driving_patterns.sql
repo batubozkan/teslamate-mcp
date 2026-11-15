@@ -21,8 +21,9 @@ SELECT c.name as car_name,
     AVG(d.distance) as avg_distance_km
 FROM drives d
     JOIN cars c ON d.car_id = c.id
-WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
-    AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+WHERE d.end_date IS NOT NULL -- a drive still open is not a drive yet
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+    AND (%(days)s::int IS NULL OR d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
 GROUP BY c.name,
     EXTRACT(
         DOW

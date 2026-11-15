@@ -4,8 +4,12 @@ SELECT DATE((start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text) AS drive_
     SUM(duration_min) AS total_minutes
 FROM drives
     JOIN cars c ON drives.car_id = c.id
-WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
-    AND (%(days)s::int IS NULL OR start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+WHERE drives.end_date IS NOT NULL -- a drive still open is not a drive yet
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+    AND (%(days)s::int IS NULL OR (start_date >= (SELECT (date_trunc('day', (now() - make_interval(days => %(days)s::int))
+                AT TIME ZONE %(tz)s::text) AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC')
+            AND start_date >= (now() AT TIME ZONE 'UTC')
+                - make_interval(days => %(days)s::int + 1)))
 GROUP BY DATE((start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text)
 ORDER BY DATE((start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text) DESC
 LIMIT %(limit)s::int;

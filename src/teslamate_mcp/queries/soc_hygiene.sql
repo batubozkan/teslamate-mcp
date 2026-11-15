@@ -10,7 +10,7 @@ SELECT c.name AS car_name,
 FROM positions p
     JOIN cars c ON p.car_id = c.id
 WHERE p.battery_level IS NOT NULL
-    AND p.date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+    AND p.date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
     AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.name
 ORDER BY c.name;

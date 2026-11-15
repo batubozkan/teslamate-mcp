@@ -1,5 +1,5 @@
 name = "get_battery_health_summary"
-description = "Latest battery snapshot per car: battery level and usable battery level (%), rated/ideal/estimated range (km), battery health as the rated-to-ideal range ratio (%), the rated range at 100 % from recent charges, the usable capacity estimated from long charges (kWh), lifetime AC and DC energy added (kWh), and the charge cycles (lifetime energy added / estimated capacity). Optional filters: car_name. get_battery_capacity_trend has the capacity per month."
+description = "Latest battery snapshot per car: battery level and usable battery level (%), rated/ideal/estimated range (km), the rated range at 100 % from recent charges, the best range at 100 % the car has shown, battery health as the first against the second (%; 94 means the car has lost 6 % of its best range), the usable capacity estimated from long charges (kWh), lifetime AC and DC energy added (kWh), and the charge cycles (lifetime energy added / estimated capacity). Optional filters: car_name. get_battery_capacity_trend has the capacity per month."
 
 [[params]]
 name = "car_name"
@@ -33,6 +33,12 @@ type = "number"
 [[output]]
 name = "battery_health_pct"
 type = "number"
+description = "range_at_100_km as a percent of best_range_at_100_km, at most 100."
+
+[[output]]
+name = "best_range_at_100_km"
+type = "number"
+description = "95th percentile of the range at 100 % over all charges that ended at 50 % or more."
 
 [[output]]
 name = "range_at_100_km"

@@ -1,5 +1,5 @@
 name = "get_cost_per_distance"
-description = "What driving costs, per local month and car: distance driven, charging sessions, kWh added split into AC and DC, recorded cost, the average price per kWh for AC, DC, and overall (over the sessions that have a cost), cost per 100 km, and kWh charged per 100 km. Newest month first. Optional filters: car_name, days. sessions_without_cost > 0 means cost and cost_per_100km undercount; get_charging_cost_estimates prices those sessions."
+description = "What driving costs, per local month and car: distance driven, charging sessions, kWh added split into AC and DC, recorded cost, the average price per kWh for AC, DC, and overall (over the sessions that have a cost, per kWh billed: the larger of kWh drawn and kWh added), cost per 100 km, and kWh charged per 100 km. Newest month first. The window starts with the month that `days` ago falls in, so the first month is a whole one. Optional filters: car_name, days. sessions_without_cost > 0 means cost and cost_per_100km undercount; get_charging_cost_estimates prices those sessions."
 
 [[params]]
 name = "car_name"

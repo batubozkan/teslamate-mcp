@@ -107,6 +107,11 @@ type = "number"
 description = "Sum of recorded costs; null when no session has one."
 
 [[output]]
+name = "sessions_without_cost"
+type = "integer"
+description = "Sessions with no recorded cost; the cost leaves them out."
+
+[[output]]
 name = "longest_drive_km"
 type = "number"
 

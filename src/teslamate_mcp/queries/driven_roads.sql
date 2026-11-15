@@ -19,7 +19,7 @@ WITH keyed AS (
         LEFT JOIN positions ep ON ep.id = d.end_position_id
     WHERE d.end_date IS NOT NULL
         AND d.distance >= %(min_distance_km)s::float8
-        AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
+        AND (%(days)s::int IS NULL OR d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 chosen AS (
@@ -37,10 +37,22 @@ chosen AS (
     ) ranked
     WHERE newest = 1
 ),
+-- How many positions the kept drives have, without reading them: TeslaMate
+-- assigns position ids in time order, so a drive's rows are the ids from its
+-- first to its last position. Rows another car logged meanwhile fall in
+-- between and overcount a little, which only thins the sample. Counting the
+-- rows themselves was a second pass over the whole positions table; only a
+-- drive that lacks either position id still has its rows counted.
 sampling AS (
-    SELECT GREATEST(1, CEIL(COUNT(*) / %(max_points)s::float8))::int AS every
-    FROM positions
-    WHERE drive_id IN (SELECT id FROM chosen)
+    SELECT GREATEST(1, CEIL((
+            COALESCE((SELECT SUM(end_position_id - start_position_id + 1) FROM chosen), 0)
+            + (
+                SELECT COUNT(*)
+                FROM chosen ch
+                    JOIN positions p ON p.drive_id = ch.id
+                WHERE ch.start_position_id IS NULL OR ch.end_position_id IS NULL
+            )
+        ) / %(max_points)s::float8))::int AS every
 ),
 -- Coordinates as integers in 1e-4 degrees (about 10 m): each drive starts
 -- with its first point and goes on in steps from the point before, which

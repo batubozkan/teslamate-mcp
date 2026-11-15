@@ -15,12 +15,13 @@ WITH scope_cars AS (
 seen AS (
     SELECT sc.id AS car_id,
         last.date AS at,
+        last.drive_id,
         last.battery_level,
         st.state,
         st.start_date AS state_since
     FROM scope_cars sc
         LEFT JOIN LATERAL (
-            SELECT p.date, p.battery_level
+            SELECT p.date, p.battery_level, p.drive_id
             FROM positions p
             WHERE p.car_id = sc.id
                 AND p.ideal_battery_range_km IS NOT NULL
@@ -43,16 +44,26 @@ last_data AS (
         s.state_since
     FROM seen s
 ),
--- A drive or charge started in the last 6 hours may simply still be running.
+-- A drive or charge with no end is lost once it has logged nothing for
+-- 6 hours. Until then it may simply still be running: a long AC charge runs
+-- well past 6 hours and logs a sample every few seconds all the way. A drive
+-- is still logging when the car's last position belongs to it (asking the
+-- positions of every open drive instead has no index to use, and its cost
+-- estimate alone switches JIT on for this query, which adds two seconds).
 open_rows AS (
     SELECT sc.id AS car_id,
         (SELECT COUNT(*) FROM drives d
             WHERE d.car_id = sc.id AND d.end_date IS NULL
-                AND d.start_date < (now() AT TIME ZONE 'UTC') - INTERVAL '6 hours') AS drives,
+                AND d.start_date < (now() AT TIME ZONE 'UTC') - INTERVAL '6 hours'
+                AND NOT COALESCE(s.drive_id = d.id
+                    AND s.at >= (now() AT TIME ZONE 'UTC') - INTERVAL '6 hours', FALSE)) AS drives,
         (SELECT COUNT(*) FROM charging_processes cp
             WHERE cp.car_id = sc.id AND cp.end_date IS NULL
-                AND cp.start_date < (now() AT TIME ZONE 'UTC') - INTERVAL '6 hours') AS charges
+                AND COALESCE((
+                        SELECT MAX(ch.date) FROM charges ch WHERE ch.charging_process_id = cp.id
+                    ), cp.start_date) < (now() AT TIME ZONE 'UTC') - INTERVAL '6 hours') AS charges
     FROM scope_cars sc
+        LEFT JOIN seen s ON s.car_id = sc.id
 ),
 -- Tires: the week before the newest reading against the week four weeks
 -- earlier. Cold lowers all four alike, so a slow leak shows as one tire
@@ -124,7 +135,13 @@ drain AS (
             FROM charging_processes cp
             WHERE cp.car_id = p.car_id
                 AND cp.start_date <= p.gap_end
-                AND COALESCE(cp.end_date, p.gap_end) >= p.gap_start
+                -- A session never closed ends at its last charge sample; taken
+                -- as still running it would hide every later gap.
+                AND COALESCE(cp.end_date, (
+                        SELECT MAX(ch.date)
+                        FROM charges ch
+                        WHERE ch.charging_process_id = cp.id
+                    ), cp.start_date) >= p.gap_start
         )
     GROUP BY p.car_id
 ),

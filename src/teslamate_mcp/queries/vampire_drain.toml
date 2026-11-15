@@ -1,5 +1,5 @@
 name = "get_vampire_drain"
-description = "Vampire (standby) drain: rated range lost while parked between consecutive drives, excluding any gap that contains a charging session. Computed from each drive's ending rated range vs the next drive's starting rated range. Returns the worst gaps first with duration, range loss (km), loss rate per hour, and the parking location."
+description = "Vampire (standby) drain: rated range lost while parked between consecutive drives, excluding any gap that contains a charging session (a session TeslaMate never closed ends at its last charge sample). Computed from each drive's ending rated range vs the next drive's starting rated range. Returns the worst gaps first with duration, range loss (km), loss rate per hour, and the parking location (the geofence name when the car parked in one, else the address)."
 
 [[params]]
 name = "car_name"

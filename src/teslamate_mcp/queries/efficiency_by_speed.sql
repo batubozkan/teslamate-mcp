@@ -15,7 +15,7 @@ WITH samples AS (
         JOIN cars c ON c.id = d.car_id
         JOIN positions p ON p.drive_id = d.id
     WHERE d.end_date IS NOT NULL
-        AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
         AND (%(outside_temp_c)s::float8 IS NULL
             OR ABS(d.outside_temp_avg - %(outside_temp_c)s::float8) <= 5)

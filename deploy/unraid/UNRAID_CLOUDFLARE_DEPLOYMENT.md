@@ -94,10 +94,9 @@ Option B — manual (**Docker → Add Container**):
 | Env `REPORT_TIMEZONE` | `Europe/Istanbul` (IANA name; daily/monthly buckets follow local midnight) |
 | Env `LOG_LEVEL` | `INFO` |
 
-> **Private image:** `ghcr.io/batubozkan/teslamate-mcp` is a private GHCR package. Before the
-> first pull, run `docker login ghcr.io -u batubozkan` on the Unraid terminal with a GitHub
-> PAT (classic, `read:packages` scope) — or make the package public in its GitHub settings.
-> Releases are published by pushing a `v*` tag (`git tag v0.x.y && git push origin v0.x.y`).
+> **Public image:** `ghcr.io/batubozkan/teslamate-mcp` is a public GHCR package, so Unraid
+> pulls it without a login. Releases are published by pushing a `v*` tag
+> (`git tag v0.x.y && git push origin v0.x.y`).
 
 > The image's default command already runs the HTTP transport
 > (`teslamate-mcp http --host 0.0.0.0 --port 8888 --json-response --stateless`, as of 0.6.0),

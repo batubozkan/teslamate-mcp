@@ -71,7 +71,10 @@
   .legend { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 12px; }
   .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
   .legend .peak { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-  .legend .key { width: 12px; height: 0; border-top: 2.5px solid; flex: none; }
+  .legend .key { width: 18px; height: 0; border-top: 2.5px solid; flex: none; }
+  /* Six colors: a seventh session and later reuse them with a dashed line. */
+  .legend .key.dashed, .tooltip .key.dashed { border-top-style: dashed; }
+  .series-line.dashed { stroke-dasharray: 5 5; }
   .chart-wrap { position: relative; margin-top: 6px; }
   svg { display: block; width: 100%; }
   svg:focus { outline: 1.5px solid var(--series-1); outline-offset: 2px; border-radius: 2px; }
@@ -90,7 +93,7 @@
   }
   .tooltip .t { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
   .tooltip .row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-  .tooltip .key { width: 10px; height: 0; border-top: 2px solid; flex: none; }
+  .tooltip .key { width: 18px; height: 0; border-top: 2.5px solid; flex: none; }
   .tooltip .val { font-weight: 600; font-variant-numeric: tabular-nums; }
   .tooltip .lab { color: var(--text-secondary); font-size: 11px; }
   .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
@@ -160,7 +163,7 @@ window.addEventListener("message", (event) => {
   if (msg.method === "ui/notifications/host-context-changed") {
     const p = msg.params || {};
     if (p.theme) applyTheme(p.theme);
-    if (p.containerDimensions) render();
+    if (p.containerDimensions) onResize();
     return;
   }
   if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
@@ -198,13 +201,23 @@ request("ui/initialize", {
 /* ---------- data handling ---------- */
 let rows = [];
 let hoverIndex = -1;
+// What the tool was asked for, when it narrowed the data; the subtitle keeps
+// it in front of the number of sessions that came back.
+let inputSubtitle = null;
 
 function onToolInput(args) {
   const bits = [];
-  if (args && args.charging_process_ids) bits.push("sessions " + args.charging_process_ids);
+  if (args && args.charging_process_ids) {
+    bits.push("ids " + String(args.charging_process_ids).split(",").map((s) => s.trim()).join(", "));
+  }
   if (args && args.location) bits.push('at "' + args.location + '"');
   if (args && args.car_name) bits.push('cars matching "' + args.car_name + '"');
-  if (bits.length) setText("subtitle", bits.join(" · "));
+  inputSubtitle = bits.length ? bits.join(" · ") : null;
+  if (inputSubtitle) setText("subtitle", inputSubtitle);
+}
+// The filter text, or the generic line, then what the data adds (the count).
+function setSubtitle(detail) {
+  setText("subtitle", (inputSubtitle || "Charging power by battery level") + (detail ? " · " + detail : ""));
 }
 
 /* Rows come from structuredContent.result; hosts that pass the result through
@@ -237,6 +250,7 @@ function onToolResult(result) {
   document.getElementById("tooltip").style.display = "none";
   buildModel();
   if (!levels.length) {
+    setSubtitle(""); // not the count of the result before
     showState("No charging samples found for these sessions.");
     return;
   }
@@ -264,7 +278,7 @@ function showData() {
 function setText(id, text) { document.getElementById(id).textContent = text; }
 
 /* ---------- model ---------- */
-let series = []; // {id, label, type, color, byLevel: Map<level, {kw, max}>, peak}
+let series = []; // {id, label, type, color, dashed, byLevel: Map<level, {kw, max}>, peak}
 let levels = []; // battery levels present in any session, ascending
 
 const TYPE_LABEL = { supercharger: "Supercharger", other_dc: "DC", ac: "AC" };
@@ -295,7 +309,9 @@ function buildModel() {
     levelSet.add(r.battery_level);
   }
   levels = [...levelSet].sort((a, b) => a - b);
-  series = [...byId.values()].map((s, i) => ({ ...s, color: "var(--series-" + ((i % 6) + 1) + ")" }));
+  series = [...byId.values()].map((s, i) => ({
+    ...s, color: "var(--series-" + ((i % 6) + 1) + ")", dashed: i % 12 >= 6,
+  }));
 }
 
 /* Average power over the samples between 20% and 80%, the fairest single
@@ -325,15 +341,14 @@ function renderStats() {
     d.append(dv, dl);
     return d;
   }));
-  setText("subtitle", "Charging power by battery level · " + series.length
-    + (series.length === 1 ? " session" : " sessions"));
+  setSubtitle(series.length + (series.length === 1 ? " session" : " sessions"));
 }
 
 function renderLegend() {
   const box = document.getElementById("legend");
   box.replaceChildren(...series.map((s) => {
     const item = document.createElement("div"); item.className = "item";
-    const key = document.createElement("span"); key.className = "key";
+    const key = document.createElement("span"); key.className = s.dashed ? "key dashed" : "key";
     key.style.borderTopColor = s.color;
     const lab = document.createElement("span");
     lab.textContent = s.label + (s.type ? " (" + s.type + ")" : "");
@@ -410,8 +425,17 @@ function runs(s) {
   return out;
 }
 
+// Only a new width changes the drawing. The view's height changes with every
+// render and table toggle, and redrawing for those would do the work twice.
+let drawnWidth = -1;
+function rootWidth() { return document.getElementById("root").clientWidth; }
+function onResize() {
+  if (rootWidth() !== drawnWidth && levels.length) render(); else reportSize();
+}
+
 function render() {
   if (!levels.length) { reportSize(); return; }
+  drawnWidth = rootWidth();
   const svg = document.getElementById("chart");
   const width = Math.max(280, svg.parentElement.clientWidth || 280);
   const height = M.top + PANEL_H + M.xAxis;
@@ -454,7 +478,9 @@ function render() {
       if (run.length === 1) {
         svg.append(el("circle", { cx: x(run[0]), cy: y(s.byLevel.get(run[0]).kw), r: 2, fill: s.color }));
       } else {
-        svg.append(el("path", { d, class: "series-line", stroke: s.color }));
+        svg.append(el("path", {
+          d, class: s.dashed ? "series-line dashed" : "series-line", stroke: s.color,
+        }));
       }
     }
   }
@@ -528,7 +554,7 @@ function showHover(i) {
     dot.style.display = "";
     dot.setAttribute("cx", cx); dot.setAttribute("cy", geom.y(p.kw));
     const row = document.createElement("div"); row.className = "row";
-    const key = document.createElement("span"); key.className = "key";
+    const key = document.createElement("span"); key.className = s.dashed ? "key dashed" : "key";
     key.style.borderTopColor = s.color;
     const v = document.createElement("span"); v.className = "val";
     v.textContent = p.kw + " kW";
@@ -553,17 +579,19 @@ function hideHover() {
 
 /* ---------- sizing ---------- */
 let sizeRaf = 0;
+// The root's own height, not the document's scrollHeight: that is never less
+// than the frame, so a host that sizes the frame from this report could not
+// shrink the view again after a closed table or a shorter result.
 function reportSize() {
   cancelAnimationFrame(sizeRaf);
   sizeRaf = requestAnimationFrame(() => {
     notify("ui/notifications/size-changed", {
       width: document.documentElement.scrollWidth,
-      height: document.documentElement.scrollHeight,
+      height: Math.ceil(document.getElementById("root").getBoundingClientRect().height),
     });
   });
 }
-new ResizeObserver(() => { if (levels.length) render(); else reportSize(); })
-  .observe(document.getElementById("root"));
+new ResizeObserver(onResize).observe(document.getElementById("root"));
 document.getElementById("tableWrap").addEventListener("toggle", reportSize);
 </script>
 </body>

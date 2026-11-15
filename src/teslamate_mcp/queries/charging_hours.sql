@@ -17,7 +17,7 @@ WITH sessions AS (
         JOIN cars c ON c.id = cp.car_id
     WHERE cp.end_date IS NOT NULL
         AND cp.charge_energy_added > 0
-        AND cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND cp.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 )
 SELECT c.name AS car_name,

@@ -4,7 +4,7 @@ description = "Charging curves of several sessions against battery level, to com
 [[params]]
 name = "charging_process_ids"
 type = "string"
-description = "Comma-separated charging session ids to compare, e.g. '212,216'. Filters are ignored when given."
+description = "Comma-separated charging session ids to compare, e.g. '212,216'. All named sessions are returned, up to 10 (the newest 10 when more are named); the filters and limit are ignored when given."
 
 [[params]]
 name = "car_name"
@@ -26,7 +26,7 @@ enum = ["dc", "supercharger", "other_dc", "ac", "any"]
 [[params]]
 name = "limit"
 type = "integer"
-description = "Maximum number of sessions compared."
+description = "Maximum number of sessions the filters pick. Ignored when charging_process_ids is given."
 default = 5
 minimum = 1
 maximum = 10

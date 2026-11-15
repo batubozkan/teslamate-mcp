@@ -1,5 +1,5 @@
 name = "get_battery_capacity_trend"
-description = "Estimate real usable battery capacity (kWh) per month from charging sessions: capacity = energy added / SOC gained, using only sessions that gained at least min_soc_delta percentage points (larger deltas give more reliable estimates). More credible than rated-range degradation heuristics. Monthly buckets follow REPORT_TIMEZONE; one row per car per month."
+description = "Estimate real usable battery capacity (kWh) per month from charging sessions: capacity = energy added / SOC gained, using only sessions that gained at least min_soc_delta percentage points (larger deltas give more reliable estimates). More credible than rated-range degradation heuristics. Monthly buckets follow REPORT_TIMEZONE, and the window starts with the month that `days` ago falls in, so the first month is a whole one; one row per car per month."
 
 [[params]]
 name = "car_name"

@@ -42,7 +42,7 @@ samples AS (
             AND p.date < COALESCE(pk.park_end, 'infinity')
     WHERE p.drive_id IS NULL
         AND p.is_climate_on IS NOT NULL
-        AND p.date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND p.date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
     WINDOW w AS (PARTITION BY p.car_id, pk.park_start ORDER BY p.date)
 ),
 marked AS (

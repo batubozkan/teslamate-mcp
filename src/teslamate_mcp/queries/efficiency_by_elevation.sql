@@ -18,7 +18,7 @@ WITH drives_scoped AS (
         AND d.end_rated_range_km IS NOT NULL
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
         AND (%(days)s::int IS NULL
-            OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int))
+            OR d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int))
 ),
 bucketed AS (
     SELECT ds.*,

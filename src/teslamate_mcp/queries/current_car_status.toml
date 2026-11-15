@@ -1,5 +1,5 @@
 name = "get_current_car_status"
-description = "Returns the latest recorded snapshot per car: what the car is doing now (car_state: driving, charging, online, asleep, or offline) and since when, battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Also returns the cabin climate (inside temperature and setpoints in °C, fan, defrosters) and the four tire pressures (bar). Most in-drive rows carry neither, so each group comes from the latest row that has it, up to 7 days before last_update; climate_at and tpms_at give that row's time. When last_update is old, TeslaMate has lost contact with the car and car_state is stale. Optional filters: car_name."
+description = "Returns the latest recorded snapshot per car: what the car is doing now (car_state: driving, charging, online, asleep, or offline) and since when, battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Rows logged while driving carry no range, outside temperature or climate state, so those three come from the car's latest full reading (range_at gives its time; during a drive it is usually seconds old). Also returns the cabin climate (inside temperature and setpoints in °C, fan, defrosters) and the four tire pressures (bar), each group from the latest row that has it, up to 7 days before last_update; climate_at and tpms_at give that row's time. When last_update is old, TeslaMate has lost contact with the car and car_state is stale. Optional filters: car_name."
 
 [[params]]
 name = "car_name"
@@ -17,6 +17,11 @@ type = "integer"
 [[output]]
 name = "rated_battery_range_km"
 type = "number"
+
+[[output]]
+name = "range_at"
+type = "string"
+description = "UTC. When the range, outside temperature and climate state were read."
 
 [[output]]
 name = "odometer"

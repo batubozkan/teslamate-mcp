@@ -37,7 +37,7 @@ from teslamate_mcp.db import build_pool
 from teslamate_mcp.server import create_server
 
 # A miniature TeslaMate-shaped schema. Rolling-window rows are seeded relative
-# to now() so CURRENT_DATE windows always match; one drive has a fixed UTC
+# to now() so the day windows always match; one drive has a fixed UTC
 # timestamp on a local-midnight boundary (22:30 UTC = 01:30 next day in
 # Europe/Istanbul) to exercise REPORT_TIMEZONE bucketing.
 _SETUP_SQL = """
@@ -700,6 +700,100 @@ FROM base CROSS JOIN (VALUES
 DROP TABLE base;
 """
 
+# Cars 19 ("Auditor", efficiency 0.15) and 20 ("Second Audit") for the 0.19.0
+# definitions, on UTC times like TeslaMate.
+#   Geofence 90 "Villa" covers addresses 91 and 92; address 93 "Far Cafe" has none.
+#   Drives of car 19, all finished: A 20 km Cafe->Villa (91), B 1 km inside the
+#   Villa (91->92) that drops the range 3 km, C 40 km Villa->Cafe using 80 km of
+#   range, E 10 km Cafe->Villa, F 10 km Villa->Cafe a day later (3 km of range
+#   lost parked in between).
+#   Sessions of car 19: 1900 at the Cafe 300 days ago to 100 %% (no cost), 1901
+#   and 1902 at the Villa (one costed 9.90 for 33 kWh drawn / 30 kWh added, one
+#   without a cost), 1903 empty, 1904 never closed (its samples stop after
+#   10 minutes, 4 days ago), 1905 still running (started 8 hours ago, samples
+#   up to half an hour ago).
+#   Positions of car 19: a polled row an hour ago and a streamed row (no range,
+#   temperature or climate) ten minutes ago, in drive 1906, which is in progress.
+#   Car 20: drives 23 h and 25 h ago, an open drive, a drive at noon on the
+#   first day of the month that 40 days ago falls in, and seven DC sessions
+#   without a cost.
+_AUDIT_SQL = """
+INSERT INTO car_settings (id) VALUES (19), (20);
+INSERT INTO cars VALUES (19, 'Auditor', 'model3', 'LR', 'White', 'Model 3 LR', 19, 0.15),
+                        (20, 'Second Audit', 'model3', 'LR', 'Grey', 'Model 3 LR', 20, 0.15);
+INSERT INTO geofences (id, name, latitude, longitude, radius) VALUES (90, 'Villa', 40.0, 30.0, 50);
+INSERT INTO addresses VALUES
+    (91, 'Villa Road 1', 'Bolu', 'TR-14', 40.0001, 30.0001, 'Turkey'),
+    (92, 'Villa Road 3', 'Bolu', 'TR-14', 40.0002, 30.0002, 'Turkey'),
+    (93, 'Far Cafe', 'Duzce', 'TR-81', 40.5, 30.5, 'Turkey');
+CREATE TEMP TABLE base AS SELECT date_trunc('minute', now() AT TIME ZONE 'UTC') AS t;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, speed_max,
+    start_km, end_km, outside_temp_avg, start_address_id, end_address_id, start_geofence_id,
+    end_geofence_id, start_rated_range_km, end_rated_range_km)
+SELECT v.id, v.car_id, base.t - v.ago, base.t - v.ago + make_interval(mins => v.mins),
+    v.km, v.mins, 90, v.km0, v.km0 + v.km, 15.0, v.sa, v.ea, v.sg, v.eg, v.r0, v.r1
+FROM base, (VALUES
+    (1901, 19, interval '10 days', 20.0, 20, 5000.0, 93, 91, NULL, 90, 300.0, 280.0),
+    (1902, 19, interval '8 days', 1.0, 5, 5020.0, 91, 92, 90, 90, 280.0, 277.0),
+    (1903, 19, interval '6 days', 40.0, 40, 5021.0, 92, 93, 90, NULL, 277.0, 197.0),
+    (1904, 19, interval '3 days', 10.0, 10, 5061.0, 93, 91, NULL, 90, 200.0, 190.0),
+    (1905, 19, interval '2 days', 10.0, 10, 5071.0, 91, 93, 90, NULL, 187.0, 177.0),
+    (2001, 20, interval '23 hours', 15.0, 15, 100.0, 93, 93, NULL, NULL, 100.0, 88.0),
+    (2002, 20, interval '25 hours', 5.0, 5, 95.0, 93, 93, NULL, NULL, 106.0, 101.0)
+) AS v(id, car_id, ago, km, mins, km0, sa, ea, sg, eg, r0, r1);
+INSERT INTO drives (id, car_id, start_date, end_date, start_address_id)
+SELECT 2003, 20, base.t - interval '26 hours', NULL::timestamp, 93 FROM base
+UNION ALL
+SELECT 1906, 19, base.t - interval '20 minutes', NULL, 93 FROM base;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, start_km, end_km,
+    start_address_id, end_address_id, start_rated_range_km, end_rated_range_km)
+SELECT 2004, 20, m.at, m.at + interval '9 minutes', 9.0, 9, 50.0, 59.0, 93, 93, 120.0, 111.0
+FROM (SELECT date_trunc('month', base.t - interval '40 days') + interval '12 hours' AS at
+    FROM base) m;
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    charge_energy_used, duration_min, cost, address_id, geofence_id, start_battery_level,
+    end_battery_level, end_rated_range_km)
+SELECT v.id, 19, base.t - v.ago, CASE WHEN v.closed THEN base.t - v.ago + interval '1 hour' END,
+    v.added, v.used, 60, v.cost, v.addr, v.fence, v.l0, v.l1, v.r1
+FROM base, (VALUES
+    (1900, interval '300 days', TRUE, 40.0, 42.0, NULL::numeric, 93, NULL, 60, 100, 330.0),
+    (1901, interval '9 days', TRUE, 30.0, 33.0, 9.90, 91, 90, 40, 80, 240.0),
+    (1902, interval '7 days', TRUE, 10.0, 11.0, NULL, 92, 90, 45, 60, 174.0),
+    (1903, interval '5 days', TRUE, 0.0, 0.0, NULL, 91, 90, NULL, NULL, NULL),
+    (1904, interval '4 days', FALSE, NULL, NULL, NULL, 91, 90, 50, NULL, NULL),
+    (1905, interval '8 hours', FALSE, NULL, NULL, NULL, 91, 90, 30, NULL, NULL)
+) AS v(id, ago, closed, added, used, cost, addr, fence, l0, l1, r1);
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases)
+SELECT 1904, base.t - interval '4 days' + make_interval(mins => n), 50, 11, 3
+FROM base, generate_series(0, 10) AS n
+UNION ALL
+SELECT 1905, base.t - interval '8 hours' + make_interval(mins => 30 * n), 30 + n, 11, 3
+FROM base, generate_series(0, 15) AS n;
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    charge_energy_used, duration_min, cost, address_id, start_battery_level, end_battery_level)
+SELECT 2000 + n, 20, base.t - make_interval(days => 50 + n),
+    base.t - make_interval(days => 50 + n) + interval '20 minutes', 20.0, 21.0, 20, NULL, 93,
+    20, 45
+FROM base, generate_series(1, 7) AS n;
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases,
+    fast_charger_present, fast_charger_brand)
+SELECT cp.id, cp.start_date + make_interval(mins => 10 * k), 20 + 10 * k, 100 - 10 * k, NULL,
+    TRUE, 'Tesla'
+FROM charging_processes cp, generate_series(0, 1) AS k
+WHERE cp.car_id = 20;
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_battery_level,
+    rated_battery_range_km, ideal_battery_range_km, odometer, outside_temp, is_climate_on,
+    drive_id)
+SELECT 19, base.t - interval '1 hour', 40.5, 30.5, 55, 54, 250.0, 250.0, 5081.0, 11.0, FALSE,
+    NULL
+FROM base
+UNION ALL
+SELECT 19, base.t - interval '10 minutes', 40.51, 30.51, 54, NULL, NULL, NULL, 5083.0, NULL, NULL,
+    1906
+FROM base;
+DROP TABLE base;
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -713,6 +807,7 @@ _EXTRA_SEEDS = {
     "gaps": _GAPS_SQL,
     "insights": _INSIGHTS_SQL,
     "medic": _MEDIC_SQL,
+    "audit": _AUDIT_SQL,
 }
 
 

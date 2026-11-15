@@ -15,7 +15,10 @@ WITH scoped_drives AS (
     FROM drives d
         JOIN cars c ON c.id = d.car_id
     WHERE d.end_date IS NOT NULL
-        AND d.start_date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+        AND (d.start_date >= (SELECT (date_trunc('month', (now() - make_interval(days => %(days)s::int))
+                AT TIME ZONE %(tz)s::text) AT TIME ZONE %(tz)s::text) AT TIME ZONE 'UTC')
+            AND d.start_date >= (now() AT TIME ZONE 'UTC')
+                - make_interval(days => %(days)s::int + 31))
         AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 ),
 samples AS (

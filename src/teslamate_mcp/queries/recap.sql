@@ -56,6 +56,7 @@ period_charges AS (
         CROSS JOIN bounds b
     WHERE cp.car_id IN (SELECT id FROM scope_cars)
         AND cp.end_date IS NOT NULL
+        AND cp.charge_energy_added > 0
         AND cp.start_date >= b.start_utc
         AND cp.start_date < b.end_utc
 ),
@@ -87,7 +88,8 @@ charging AS (
     SELECT COUNT(*) AS sessions,
         COUNT(*) FILTER (WHERE pc.is_dc) AS dc_sessions,
         SUM(pc.charge_energy_added) AS kwh_added,
-        SUM(pc.cost) AS cost
+        SUM(pc.cost) AS cost,
+        COUNT(*) FILTER (WHERE pc.cost IS NULL) AS sessions_without_cost
     FROM period_charges pc
 ),
 longest AS (
@@ -174,6 +176,7 @@ SELECT CASE WHEN %(period)s::text = 'year' THEN TO_CHAR(b.first_day, 'YYYY')
     COALESCE(ch.dc_sessions, 0) AS dc_sessions,
     ROUND(COALESCE(ch.kwh_added, 0)::numeric, 1) AS kwh_added,
     ROUND(ch.cost::numeric, 2) AS charging_cost,
+    ch.sessions_without_cost,
     ROUND(l.distance::numeric, 1) AS longest_drive_km,
     TO_CHAR(l.local_day, 'YYYY-MM-DD') AS longest_drive_date,
     l.from_place AS longest_drive_from,

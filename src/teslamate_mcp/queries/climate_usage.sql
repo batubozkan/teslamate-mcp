@@ -17,9 +17,7 @@ scope_cars AS (
 parks AS (
     SELECT d.car_id,
         d.end_date AS park_start,
-        LEAD(d.start_date) OVER (PARTITION BY d.car_id ORDER BY d.start_date) AS park_end,
-        d.end_address_id,
-        d.end_geofence_id
+        LEAD(d.start_date) OVER (PARTITION BY d.car_id ORDER BY d.start_date) AS park_end
     FROM drives d
     WHERE d.car_id IN (SELECT id FROM scope_cars)
         AND d.end_date IS NOT NULL
@@ -29,13 +27,10 @@ samples AS (
         p.date,
         p.is_climate_on,
         p.power,
-        p.inside_temp,
         p.outside_temp,
         p.driver_temp_setting,
         pk.park_start,
         pk.park_end,
-        pk.end_address_id,
-        pk.end_geofence_id,
         LEAD(p.date) OVER w AS next_date,
         LAG(p.date) OVER w AS prev_date,
         LAG(p.is_climate_on) OVER w AS prev_on
@@ -72,15 +67,12 @@ sessions AS (
     SELECT g.car_id,
         g.park_start,
         MIN(g.park_end) AS park_end,
-        MIN(g.end_address_id) AS address_id,
-        MIN(g.end_geofence_id) AS geofence_id,
         MIN(g.date) AS start_date,
         MAX(g.credit_end) AS end_date,
         COALESCE(SUM(GREATEST(g.power, 0) * EXTRACT(EPOCH FROM (g.credit_end - g.date)) / 3600.0)
             FILTER (WHERE NOT g.plugged_in), 0) AS kwh,
         BOOL_OR(g.plugged_in) AS plugged_in,
         AVG(g.outside_temp) AS outside_temp,
-        AVG(g.inside_temp) AS inside_temp,
         AVG(g.driver_temp_setting) AS setpoint
     FROM grouped g
     WHERE g.is_climate_on

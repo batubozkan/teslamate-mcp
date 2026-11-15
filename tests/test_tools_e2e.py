@@ -173,7 +173,11 @@ async def test_battery_capacity_trend(mcp_session) -> None:
 
 async def test_soc_hygiene_percentages(mcp_session) -> None:
     async with mcp_session() as session:
-        rows = rows_from(await session.call_tool("get_soc_hygiene", {"car_name": "blue"}))
+        # The oldest sample is exactly 30 days old, just outside the default
+        # window of the last 30 x 24 hours.
+        rows = rows_from(
+            await session.call_tool("get_soc_hygiene", {"car_name": "blue", "days": 31})
+        )
         assert len(rows) == 1
         blue = rows[0]
         assert blue["samples"] == 5  # SOC values 100, 80, 15, 90, 55
